@@ -10,6 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     
     <style>
+        /* CSS yang sama seperti sebelumnya */
         body {
             margin: 0;
             padding: 0;
@@ -199,6 +200,17 @@
             z-index: 100;
             max-width: 200px;
         }
+        #connection-status {
+            position: absolute;
+            top: 220px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
@@ -221,14 +233,15 @@
         <div id="skill-earthquake" class="skill-btn" title="Elemen Gempa">⛰️</div>
         <div id="skill-thunder" class="skill-btn" title="Elemen Halilintar">⚡</div>
     </div>
-    <div id="enemy-hp">🧡 Musuh: 500</div>
-    <div id="player-hp">❤️ Anda: 100</div>
-    <div id="enemy-status">Status Musuh: Normal</div>
-    <div id="current-skill"> Normal </div>
+    <div id="enemy-hp">💜 500</div>
+    <div id="player-hp">❤️ 200</div>
+    <div id="enemy-status">Normal</div>
+    <div id="current-skill">Biasa</div>
     
     <!-- UI untuk MABAR -->
-    <div id="multiplayer-info">Pemain Online: <span id="player-count">1</span></div>
-    <div id="multiplayer-status">MABAR: Menunggu pemain...</div>
+    <div id="multiplayer-info">Player:<span id="player-count">1</span></div>
+    <div id="multiplayer-status">Menunggu pemain...</div>
+    <div id="connection-status">Memeriksa...</div>
 
     <div id="game-over">
         <h2>GAME OVER</h2>
@@ -264,8 +277,12 @@
         let playerId;
         let playersRef;
         let currentPlayerRef;
+        let enemyRef;
         let otherPlayers = {};
         let otherPlayerObjects = {};
+        let isOnline = false;
+        let connectionCheckInterval;
+        let playerDataUpdateInterval;
 
         // ========== VARIABEL GAME ==========
         let scene, camera, renderer;
@@ -276,8 +293,8 @@
         let playerDirection = new THREE.Vector3();
         let playerSpeed = 0.1;
         let currentSkill = 'normal';
-        let enemyHP = 500; // Diubah menjadi 500
-        let playerHP = 100;
+        let enemyHP = 500;
+        let playerHP = 200; // Diubah menjadi 200
         let clock = new THREE.Clock();
         let teleportCooldown = false;
         let skillEffects = [];
@@ -289,8 +306,8 @@
         let enemySlowTime = 0;
         let skillActive = false;
         let enemyAttackCooldown = 0;
-        let enemyAttackDamage = 5;
-        let enemyAttackInterval = 1; // detik
+        let enemyAttackDamage = 10; // Ditingkatkan dari 5
+        let enemyAttackInterval = 0.7; // Dikurangi dari 1 detik
         let lastEnemyAttackTime = 0;
         let gameOver = false;
         let gameWin = false;
@@ -299,6 +316,7 @@
         let earthquakeWall = null;
         let earthquakeWallTime = 0;
         let defaultSkinApplied = false;
+        let playerCounter = 1;
 
         // ========== FUNGSI MULTIPLAYER ==========
         
@@ -307,10 +325,51 @@
             return 'player_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
         }
 
+        // Generate player name
+        function generatePlayerName() {
+            const playerNumber = playerCounter++;
+            return 'Player ' + (playerNumber < 10 ? '0' + playerNumber : playerNumber);
+        }
+
+        // Check internet connection
+        function checkConnection() {
+            const connectionStatus = document.getElementById('connection-status');
+            
+            // Test Firebase connection
+            const connectedRef = database.ref(".info/connected");
+            connectedRef.on("value", function(snap) {
+                if (snap.val() === true) {
+                    isOnline = true;
+                    connectionStatus.textContent = 'Online';
+                    connectionStatus.style.backgroundColor = 'rgba(0, 150, 0, 0.5)';
+                    
+                    // Initialize multiplayer if not already done
+                    if (!playersRef) {
+                        initMultiplayer();
+                    }
+                } else {
+                    isOnline = false;
+                    connectionStatus.textContent = 'Offline';
+                    connectionStatus.style.backgroundColor = 'rgba(150, 0, 0, 0.5)';
+                    
+                    // Clear multiplayer data
+                    clearOtherPlayers();
+                    document.getElementById('multiplayer-status').textContent = 'MABAR: OFFLINE - Periksa koneksi internet';
+                    document.getElementById('player-count').textContent = '1';
+                }
+            });
+        }
+
         // Initialize multiplayer system
         function initMultiplayer() {
+            if (!isOnline) {
+                document.getElementById('multiplayer-status').textContent = 'MABAR: OFFLINE - Periksa koneksi internet';
+                return;
+            }
+            
             playerId = generatePlayerId();
             playersRef = database.ref('players');
+            enemyRef = database.ref('enemy');
             currentPlayerRef = playersRef.child(playerId);
             
             console.log('Player ID:', playerId);
@@ -319,8 +378,8 @@
             // Simpan data pemain awal
             savePlayerData();
             
-            // Update posisi pemain secara berkala
-            setInterval(savePlayerData, 100);
+            // Update posisi pemain secara berkala (5ms untuk real-time)
+            playerDataUpdateInterval = setInterval(savePlayerData, 5);
             
             // Listen untuk perubahan data pemain lain
             playersRef.on('value', (snapshot) => {
@@ -328,40 +387,108 @@
                 renderOtherPlayers(players);
             });
             
+            // Listen untuk perubahan data musuh
+            enemyRef.on('value', (snapshot) => {
+                const enemyData = snapshot.val();
+                if (enemyData) {
+                    updateEnemyFromServer(enemyData);
+                }
+            });
+            
+            // Simpan data musuh awal
+            saveEnemyData();
+            
+            // Update data musuh secara berkala
+            setInterval(saveEnemyData, 50);
+            
             // Hapus data pemain saat keluar
             window.addEventListener('beforeunload', () => {
-                currentPlayerRef.remove();
+                cleanupMultiplayer();
             });
             
             // Handle disconnect
             currentPlayerRef.onDisconnect().remove();
+            enemyRef.onDisconnect().remove();
+        }
+
+        // Cleanup multiplayer data
+        function cleanupMultiplayer() {
+            if (currentPlayerRef) {
+                currentPlayerRef.remove();
+            }
+            if (enemyRef) {
+                enemyRef.remove();
+            }
+            if (playerDataUpdateInterval) {
+                clearInterval(playerDataUpdateInterval);
+            }
+            if (connectionCheckInterval) {
+                clearInterval(connectionCheckInterval);
+            }
         }
 
         // Simpan data pemain ke Firebase
         function savePlayerData() {
-            if (!player || !currentPlayerRef || gameOver || gameWin) return;
+            if (!player || !currentPlayerRef || gameOver || gameWin || !isOnline) return;
             
             const playerData = {
-                name: "User_" + playerId.substr(7, 5), // Nama pendek untuk tampilan
+                name: generatePlayerName(),
                 x: player.position.x,
                 y: player.position.y,
                 z: player.position.z,
                 rotationY: player.rotation.y,
                 element: currentSkill,
+                hp: playerHP,
                 timestamp: Date.now()
             };
             
             currentPlayerRef.set(playerData);
         }
 
+        // Simpan data musuh ke Firebase
+        function saveEnemyData() {
+            if (!enemy || !enemyRef || gameOver || gameWin || !isOnline) return;
+            
+            const enemyData = {
+                x: enemy.position.x,
+                y: enemy.position.y,
+                z: enemy.position.z,
+                rotationY: enemy.rotation.y,
+                hp: enemyHP,
+                status: getEnemyStatus(),
+                timestamp: Date.now()
+            };
+            
+            enemyRef.set(enemyData);
+        }
+
+        // Update enemy dari server
+        function updateEnemyFromServer(enemyData) {
+            if (!enemy || gameOver || gameWin) return;
+            
+            // Update posisi musuh dengan interpolasi untuk mengurangi lag
+            enemy.position.lerp(
+                new THREE.Vector3(enemyData.x, enemyData.y, enemyData.z), 
+                0.5
+            );
+            enemy.rotation.y = enemyData.rotationY || 0;
+            
+            // Update HP musuh
+            if (enemyHP !== enemyData.hp) {
+                enemyHP = enemyData.hp;
+                updateEnemyHP();
+                checkWin();
+            }
+        }
+
         // Render pemain lain di layar
         function renderOtherPlayers(players) {
-            if (!players) return;
+            if (!players || !isOnline) return;
             
-            // Hapus pemain yang sudah tidak aktif (lebih dari 10 detik)
+            // Hapus pemain yang sudah tidak aktif (lebih dari 5 detik)
             const currentTime = Date.now();
             Object.keys(otherPlayerObjects).forEach(playerKey => {
-                if (!players[playerKey] || (currentTime - players[playerKey].timestamp) > 10000) {
+                if (!players[playerKey] || (currentTime - players[playerKey].timestamp) > 5000) {
                     if (otherPlayerObjects[playerKey]) {
                         scene.remove(otherPlayerObjects[playerKey]);
                         delete otherPlayerObjects[playerKey];
@@ -397,7 +524,7 @@
             
             // Kepala
             const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-            const headMaterial = new THREE.MeshStandardMaterial({ color: 0x00FF00 }); // Hijau untuk pemain lain
+            const headMaterial = new THREE.MeshStandardMaterial({ color: 0x00FF00 });
             const head = new THREE.Mesh(headGeometry, headMaterial);
             head.position.y = 1.7;
             otherPlayer.add(head);
@@ -478,7 +605,7 @@
         function updateOtherPlayer(playerKey, playerData) {
             const otherPlayer = otherPlayerObjects[playerKey];
             if (otherPlayer) {
-                // Smooth movement
+                // Smooth movement dengan interpolasi untuk mengurangi lag
                 otherPlayer.position.lerp(
                     new THREE.Vector3(playerData.x, playerData.y, playerData.z), 
                     0.5
@@ -576,6 +703,14 @@
             return Object.keys(otherPlayers).length;
         }
 
+        // Dapatkan status musuh
+        function getEnemyStatus() {
+            if (enemyBound) return "Terikat Akar";
+            if (enemyOnFire) return "Terbakar";
+            if (enemySlowed) return "Melambat";
+            return "Normal";
+        }
+
         // ========== KODE GAME YANG SUDAH ADA ==========
 
         // Inisialisasi scene
@@ -629,8 +764,9 @@
             // Terapkan skin default
             applyDefaultSkin();
 
-            // Inisialisasi sistem multiplayer
-            initMultiplayer();
+            // Periksa koneksi internet
+            checkConnection();
+            connectionCheckInterval = setInterval(checkConnection, 5000);
 
             // Start animation loop
             animate();
@@ -2096,6 +2232,12 @@
             if (playerHP <= 0 && !gameOver) {
                 gameOver = true;
                 document.getElementById('game-over').style.display = 'block';
+                
+                // Reset database dan refresh browser
+                setTimeout(() => {
+                    cleanupMultiplayer();
+                    location.reload();
+                }, 3000);
             }
         }
 
@@ -2103,12 +2245,18 @@
             if (enemyHP <= 0 && !gameWin) {
                 gameWin = true;
                 document.getElementById('game-win').style.display = 'block';
+                
+                // Reset database dan refresh browser
+                setTimeout(() => {
+                    cleanupMultiplayer();
+                    location.reload();
+                }, 3000);
             }
         }
 
         function resetGame() {
             // Reset semua variabel game
-            playerHP = 100;
+            playerHP = 200;
             enemyHP = 500;
             currentSkill = 'normal';
             gameOver = false;
@@ -2154,6 +2302,7 @@
             
             // Reset multiplayer data
             savePlayerData();
+            saveEnemyData();
         }
 
         function onWindowResize() {
@@ -2162,7 +2311,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Animate enemy movement dengan animasi yang lebih baik
+        // Animate enemy movement dengan AI yang lebih cerdas
         function animateEnemy() {
             if (enemyBound) return;
             
@@ -2174,9 +2323,23 @@
                 }
             }
             
-            // Simple AI: move towards player
+            // AI: Cari player terdekat (player utama atau player lain)
+            let targetPlayer = player;
+            let minDistance = player.position.distanceTo(enemy.position);
+            
+            // Cek player lain
+            Object.keys(otherPlayerObjects).forEach(playerKey => {
+                const otherPlayer = otherPlayerObjects[playerKey];
+                const distance = otherPlayer.position.distanceTo(enemy.position);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    targetPlayer = otherPlayer;
+                }
+            });
+            
+            // Bergerak menuju player terdekat
             const direction = new THREE.Vector3()
-                .subVectors(player.position, enemy.position)
+                .subVectors(targetPlayer.position, enemy.position)
                 .normalize();
             
             // Move slower when bound or slowed
@@ -2211,10 +2374,10 @@
                 enemy.position.z += direction.z * speed;
             }
             
-            // Rotate enemy to face player
+            // Rotate enemy to face player terdekat
             enemy.rotation.y = Math.atan2(
-                player.position.x - enemy.position.x,
-                player.position.z - enemy.position.z
+                targetPlayer.position.x - enemy.position.x,
+                targetPlayer.position.z - enemy.position.z
             );
             
             // Animasi berjalan musuh yang lebih smooth
