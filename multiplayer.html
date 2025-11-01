@@ -1,0 +1,2384 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game 7 Elemental 3D - Diperbarui</title>
+    
+    <!-- Firebase SDK untuk MABAR -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: white;
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+        #joystick {
+            width: 100px;
+            height: 100px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            position: relative;
+            touch-action: none;
+        }
+        #joystick-handle {
+            width: 40px;
+            height: 40px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            position: absolute;
+            top: 30px;
+            left: 30px;
+        }
+        #buttons {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+        }
+        .btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 2px solid white;
+            cursor: pointer;
+            user-select: none;
+        }
+        #skill-buttons {
+            position: absolute;
+            bottom: 100px;
+            right: 20px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .skill-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 2px solid white;
+            cursor: pointer;
+            user-select: none;
+        }
+        #enemy-hp {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 18px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        #player-hp {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            color: white;
+            font-size: 18px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        #current-skill {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 18px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        #skill-info {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            color: white;
+            font-size: 16px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+            max-width: 200px;
+            text-align: center;
+        }
+        #game-title {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+        }
+        #game-over, #game-win {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+            z-index: 200;
+        }
+        #restart-btn {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        #enemy-status {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            color: white;
+            font-size: 16px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        /* UI untuk MABAR */
+        #multiplayer-info {
+            position: absolute;
+            top: 140px;
+            left: 20px;
+            color: white;
+            font-size: 16px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #multiplayer-status {
+            position: absolute;
+            top: 180px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 100;
+            max-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-title">GAME BY TAHER - VERSI DIPERBARUI</div>
+    <div id="ui">
+        <div id="joystick">
+            <div id="joystick-handle"></div>
+        </div>
+    </div>
+    <div id="buttons">
+        <div id="teleport" class="btn">SKILL</div>
+        <div id="toggle-skills" class="btn">🆙</div>
+    </div>
+    <div id="skill-buttons">
+        <div id="skill-root" class="skill-btn" title="Elemen Akar">🍀</div>
+        <div id="skill-solar" class="skill-btn" title="Elemen Solar">✴️</div>
+        <div id="skill-wave" class="skill-btn" title="Elemen Ombak">💧</div>
+        <div id="skill-tornado" class="skill-btn" title="Elemen Topan">🌪️</div>
+        <div id="skill-blaze" class="skill-btn" title="Elemen Blaze">🔥</div>
+        <div id="skill-earthquake" class="skill-btn" title="Elemen Gempa">⛰️</div>
+        <div id="skill-thunder" class="skill-btn" title="Elemen Halilintar">⚡</div>
+    </div>
+    <div id="enemy-hp">🧡 Musuh: 500</div>
+    <div id="player-hp">❤️ Anda: 100</div>
+    <div id="enemy-status">Status Musuh: Normal</div>
+    <div id="current-skill"> Normal </div>
+    
+    <!-- UI untuk MABAR -->
+    <div id="multiplayer-info">Pemain Online: <span id="player-count">1</span></div>
+    <div id="multiplayer-status">MABAR: Menunggu pemain...</div>
+
+    <div id="game-over">
+        <h2>GAME OVER</h2>
+        <p>Anda telah dikalahkan!</p>
+        <button id="restart-btn">Mulai Ulang</button>
+    </div>
+
+    <div id="game-win">
+        <h2>MENANG!</h2>
+        <p>Anda telah mengalahkan musuh!</p>
+        <button id="win-restart-btn">Main Lagi</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ========== KONFIGURASI FIREBASE ==========
+        const firebaseConfig = {
+            apiKey: "AIzaSyAQobSSWqAnctUFiGjf4RNMWueo3SV_fMY",
+            authDomain: "taher-my-id.firebaseapp.com",
+            databaseURL: "https://taher-my-id-default-rtdb.firebaseio.com",
+            projectId: "taher-my-id",
+            storageBucket: "taher-my-id.appspot.com",
+            messagingSenderId: "844154238987",
+            appId: "1:844154238987:web:7f7bb48c3c4a89f9442f0e",
+            measurementId: "G-MPK8W5SB88"
+        };
+
+        // Inisialisasi Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // ========== VARIABEL MULTIPLAYER ==========
+        let playerId;
+        let playersRef;
+        let currentPlayerRef;
+        let otherPlayers = {};
+        let otherPlayerObjects = {};
+
+        // ========== VARIABEL GAME ==========
+        let scene, camera, renderer;
+        let player, enemy;
+        let joystick, joystickHandle;
+        let isJoystickActive = false;
+        let playerVelocity = new THREE.Vector3();
+        let playerDirection = new THREE.Vector3();
+        let playerSpeed = 0.1;
+        let currentSkill = 'normal';
+        let enemyHP = 500; // Diubah menjadi 500
+        let playerHP = 100;
+        let clock = new THREE.Clock();
+        let teleportCooldown = false;
+        let skillEffects = [];
+        let enemyBound = false;
+        let enemyBoundTime = 0;
+        let enemyOnFire = false;
+        let enemyFireTime = 0;
+        let enemySlowed = false;
+        let enemySlowTime = 0;
+        let skillActive = false;
+        let enemyAttackCooldown = 0;
+        let enemyAttackDamage = 5;
+        let enemyAttackInterval = 1; // detik
+        let lastEnemyAttackTime = 0;
+        let gameOver = false;
+        let gameWin = false;
+        let enemyAnimationTime = 0;
+        let playerAnimationTime = 0;
+        let earthquakeWall = null;
+        let earthquakeWallTime = 0;
+        let defaultSkinApplied = false;
+
+        // ========== FUNGSI MULTIPLAYER ==========
+        
+        // Generate unique player ID
+        function generatePlayerId() {
+            return 'player_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        }
+
+        // Initialize multiplayer system
+        function initMultiplayer() {
+            playerId = generatePlayerId();
+            playersRef = database.ref('players');
+            currentPlayerRef = playersRef.child(playerId);
+            
+            console.log('Player ID:', playerId);
+            document.getElementById('multiplayer-status').textContent = 'MABAR: Terhubung! ID: ' + playerId.substring(0, 10) + '...';
+            
+            // Simpan data pemain awal
+            savePlayerData();
+            
+            // Update posisi pemain secara berkala
+            setInterval(savePlayerData, 100);
+            
+            // Listen untuk perubahan data pemain lain
+            playersRef.on('value', (snapshot) => {
+                const players = snapshot.val();
+                renderOtherPlayers(players);
+            });
+            
+            // Hapus data pemain saat keluar
+            window.addEventListener('beforeunload', () => {
+                currentPlayerRef.remove();
+            });
+            
+            // Handle disconnect
+            currentPlayerRef.onDisconnect().remove();
+        }
+
+        // Simpan data pemain ke Firebase
+        function savePlayerData() {
+            if (!player || !currentPlayerRef || gameOver || gameWin) return;
+            
+            const playerData = {
+                name: "User_" + playerId.substr(7, 5), // Nama pendek untuk tampilan
+                x: player.position.x,
+                y: player.position.y,
+                z: player.position.z,
+                rotationY: player.rotation.y,
+                element: currentSkill,
+                timestamp: Date.now()
+            };
+            
+            currentPlayerRef.set(playerData);
+        }
+
+        // Render pemain lain di layar
+        function renderOtherPlayers(players) {
+            if (!players) return;
+            
+            // Hapus pemain yang sudah tidak aktif (lebih dari 10 detik)
+            const currentTime = Date.now();
+            Object.keys(otherPlayerObjects).forEach(playerKey => {
+                if (!players[playerKey] || (currentTime - players[playerKey].timestamp) > 10000) {
+                    if (otherPlayerObjects[playerKey]) {
+                        scene.remove(otherPlayerObjects[playerKey]);
+                        delete otherPlayerObjects[playerKey];
+                        delete otherPlayers[playerKey];
+                    }
+                }
+            });
+            
+            // Tambah atau update pemain lain
+            Object.keys(players).forEach(playerKey => {
+                if (playerKey !== playerId) {
+                    const playerData = players[playerKey];
+                    
+                    if (!otherPlayerObjects[playerKey]) {
+                        // Buat karakter baru untuk pemain lain
+                        createOtherPlayer(playerKey, playerData);
+                    } else {
+                        // Update posisi dan rotasi pemain yang sudah ada
+                        updateOtherPlayer(playerKey, playerData);
+                    }
+                    
+                    otherPlayers[playerKey] = playerData;
+                }
+            });
+            
+            // Update jumlah pemain online
+            updatePlayerCount();
+        }
+
+        // Buat karakter untuk pemain lain
+        function createOtherPlayer(playerKey, playerData) {
+            const otherPlayer = new THREE.Group();
+            
+            // Kepala
+            const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ color: 0x00FF00 }); // Hijau untuk pemain lain
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.7;
+            otherPlayer.add(head);
+            
+            // Badan
+            const bodyGeometry = new THREE.BoxGeometry(1, 1.2, 0.5);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x00AA00 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.8;
+            otherPlayer.add(body);
+            
+            // Tangan
+            const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: 0x00AA00 });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(0.6, 0.7, 0);
+            leftArm.rotation.z = Math.PI / 6;
+            otherPlayer.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(-0.6, 0.7, 0);
+            rightArm.rotation.z = -Math.PI / 6;
+            otherPlayer.add(rightArm);
+            
+            // Kaki
+            const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({ color: 0x008800 });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(0.25, -0.8, 0);
+            otherPlayer.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(-0.25, -0.8, 0);
+            otherPlayer.add(rightLeg);
+            
+            // Nama pemain
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 128;
+            context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.font = '24px Arial';
+            context.fillStyle = 'white';
+            context.textAlign = 'center';
+            context.fillText(playerData.name, canvas.width/2, canvas.height/2 + 8);
+            
+            const nameTexture = new THREE.CanvasTexture(canvas);
+            const nameMaterial = new THREE.SpriteMaterial({ map: nameTexture });
+            const nameSprite = new THREE.Sprite(nameMaterial);
+            nameSprite.position.y = 3;
+            nameSprite.scale.set(3, 1.5, 1);
+            otherPlayer.add(nameSprite);
+            
+            // Set posisi awal
+            otherPlayer.position.set(playerData.x, playerData.y, playerData.z);
+            otherPlayer.rotation.y = playerData.rotationY || 0;
+            
+            // Update warna berdasarkan elemen
+            updateOtherPlayerElement(otherPlayer, playerData.element);
+            
+            // Tambah ke scene
+            scene.add(otherPlayer);
+            otherPlayerObjects[playerKey] = otherPlayer;
+            
+            console.log('Pemain baru bergabung:', playerData.name);
+            document.getElementById('multiplayer-status').textContent = 'MABAR: ' + playerData.name + ' bergabung!';
+            
+            // Reset status setelah 3 detik
+            setTimeout(() => {
+                document.getElementById('multiplayer-status').textContent = 'MABAR: ' + (getOnlinePlayersCount() + 1) + ' pemain online';
+            }, 3000);
+        }
+
+        // Update posisi dan rotasi pemain lain
+        function updateOtherPlayer(playerKey, playerData) {
+            const otherPlayer = otherPlayerObjects[playerKey];
+            if (otherPlayer) {
+                // Smooth movement
+                otherPlayer.position.lerp(
+                    new THREE.Vector3(playerData.x, playerData.y, playerData.z), 
+                    0.5
+                );
+                otherPlayer.rotation.y = playerData.rotationY || 0;
+                
+                // Update warna berdasarkan elemen
+                updateOtherPlayerElement(otherPlayer, playerData.element);
+            }
+        }
+
+        // Update tampilan pemain lain berdasarkan elemen
+        function updateOtherPlayerElement(otherPlayer, element) {
+            // Default warna hijau
+            let bodyColor = 0x00AA00;
+            let headColor = 0x00FF00;
+            let armColor = 0x00AA00;
+            let legColor = 0x008800;
+            
+            switch(element) {
+                case 'root':
+                    bodyColor = 0x00AA00;
+                    headColor = 0x00FF00;
+                    armColor = 0x00AA00;
+                    legColor = 0x006600;
+                    break;
+                case 'solar':
+                    bodyColor = 0xFFFFFF;
+                    headColor = 0xFFFF00;
+                    armColor = 0xFFFFFF;
+                    legColor = 0xFFFFFF;
+                    break;
+                case 'wave':
+                    bodyColor = 0x00BFFF;
+                    headColor = 0x00FFFF;
+                    armColor = 0x00BFFF;
+                    legColor = 0x0000FF;
+                    break;
+                case 'tornado':
+                    bodyColor = 0x000080;
+                    headColor = 0x4169E1;
+                    armColor = 0x000080;
+                    legColor = 0x000080;
+                    break;
+                case 'blaze':
+                    bodyColor = 0xFF4500;
+                    headColor = 0xFF0000;
+                    armColor = 0xFF4500;
+                    legColor = 0xFF4500;
+                    break;
+                case 'earthquake':
+                    bodyColor = 0x8B4513;
+                    headColor = 0xA0522D;
+                    armColor = 0x8B4513;
+                    legColor = 0x8B4513;
+                    break;
+                case 'thunder':
+                    bodyColor = 0xFF0000;
+                    headColor = 0xFF4500;
+                    armColor = 0xFF0000;
+                    legColor = 0xFF0000;
+                    break;
+            }
+            
+            // Terapkan warna
+            if (otherPlayer.children[0]) otherPlayer.children[0].material.color.setHex(headColor); // Kepala
+            if (otherPlayer.children[1]) otherPlayer.children[1].material.color.setHex(bodyColor); // Badan
+            if (otherPlayer.children[2]) otherPlayer.children[2].material.color.setHex(armColor);  // Tangan kiri
+            if (otherPlayer.children[3]) otherPlayer.children[3].material.color.setHex(armColor);  // Tangan kanan
+            if (otherPlayer.children[4]) otherPlayer.children[4].material.color.setHex(legColor);  // Kaki kiri
+            if (otherPlayer.children[5]) otherPlayer.children[5].material.color.setHex(legColor);  // Kaki kanan
+        }
+
+        // Update jumlah pemain online
+        function updatePlayerCount() {
+            const count = getOnlinePlayersCount() + 1; // +1 untuk pemain sendiri
+            document.getElementById('player-count').textContent = count;
+            
+            if (count > 1) {
+                document.getElementById('multiplayer-status').textContent = 'MABAR: ' + count + ' pemain online';
+            }
+        }
+
+        // Hapus semua pemain lain (saat reset game)
+        function clearOtherPlayers() {
+            Object.keys(otherPlayerObjects).forEach(playerKey => {
+                scene.remove(otherPlayerObjects[playerKey]);
+            });
+            otherPlayerObjects = {};
+            otherPlayers = {};
+        }
+
+        // Fungsi untuk mendapatkan jumlah pemain online
+        function getOnlinePlayersCount() {
+            return Object.keys(otherPlayers).length;
+        }
+
+        // ========== KODE GAME YANG SUDAH ADA ==========
+
+        // Inisialisasi scene
+        function init() {
+            // Setup scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); // Warna langit biru
+
+            // Setup camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 10);
+            camera.lookAt(0, 0, 0);
+
+            // Setup renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // Setup pencahayaan
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            scene.add(directionalLight);
+
+            // Buat tanah
+            createGround();
+
+            // Buat pohon
+            createTrees();
+
+            // Buat karakter player dengan skin default
+            createPlayer();
+
+            // Buat musuh
+            createEnemy();
+
+            // Setup joystick
+            joystick = document.getElementById('joystick');
+            joystickHandle = document.getElementById('joystick-handle');
+
+            // Setup event listeners
+            setupEventListeners();
+
+            // Terapkan skin default
+            applyDefaultSkin();
+
+            // Inisialisasi sistem multiplayer
+            initMultiplayer();
+
+            // Start animation loop
+            animate();
+        }
+
+        // Buat tanah hijau
+        function createGround() {
+            const groundGeometry = new THREE.PlaneGeometry(30, 30);
+            const groundMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x00ff00, 
+                roughness: 0.8 
+            });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+        }
+
+        // Buat pohon-pohon
+        function createTrees() {
+            const treePositions = [
+                { x: -10, z: -10 },
+                { x: 10, z: -10 },
+                { x: -10, z: 10 },
+                { x: 10, z: 10 },
+                { x: 0, z: 0 }
+            ];
+
+            for (let i = 0; i < 5; i++) {
+                // Batang pohon
+                const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.7, 4, 8);
+                const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.position.set(treePositions[i].x, 2, treePositions[i].z);
+                trunk.castShadow = true;
+                scene.add(trunk);
+
+                // Daun pohon
+                const leavesGeometry = new THREE.SphereGeometry(2, 8, 8);
+                const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                leaves.position.set(treePositions[i].x, 5, treePositions[i].z);
+                leaves.castShadow = true;
+                scene.add(leaves);
+            }
+        }
+
+        // Buat karakter player
+        function createPlayer() {
+            player = new THREE.Group();
+            
+            // Kepala
+            const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ color: 0xF5F5DC });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.7;
+            player.add(head);
+            
+            // Mata
+            const eyeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(0.2, 1.75, 0.4);
+            player.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(-0.2, 1.75, 0.4);
+            player.add(rightEye);
+            
+            // Badan (Baju merah dengan oranye dan hitam)
+            const bodyGeometry = new THREE.BoxGeometry(1, 1.2, 0.5);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xFF0000 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.8;
+            player.add(body);
+            
+            // Kaos dalam putih
+            const undershirtGeometry = new THREE.BoxGeometry(0.9, 1.0, 0.4);
+            const undershirtMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFFFF });
+            const undershirt = new THREE.Mesh(undershirtGeometry, undershirtMaterial);
+            undershirt.position.set(0, 0.8, 0.1);
+            player.add(undershirt);
+            
+            // Detail jaket (warna oranye)
+            const jacketDetailGeometry = new THREE.BoxGeometry(1.1, 0.4, 0.1);
+            const jacketDetailMaterial = new THREE.MeshStandardMaterial({ color: 0xFFA500 });
+            const jacketDetail = new THREE.Mesh(jacketDetailGeometry, jacketDetailMaterial);
+            jacketDetail.position.set(0, 0.9, 0.25);
+            player.add(jacketDetail);
+            
+            // Logo B
+            const logoGeometry = new THREE.PlaneGeometry(0.3, 0.3);
+            const logoMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x000000,
+                side: THREE.DoubleSide
+            });
+            const logo = new THREE.Mesh(logoGeometry, logoMaterial);
+            logo.position.set(0, 0.8, 0.26);
+            player.add(logo);
+            
+            // Tangan
+            const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: 0xFF0000 });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(0.6, 0.7, 0);
+            leftArm.rotation.z = Math.PI / 6;
+            player.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(-0.6, 0.7, 0);
+            rightArm.rotation.z = -Math.PI / 6;
+            player.add(rightArm);
+            
+            // Kaki (Celana hitam dengan garis merah)
+            const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(0.25, -0.8, 0);
+            player.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(-0.25, -0.8, 0);
+            player.add(rightLeg);
+            
+            // Garis merah pada celana
+            const stripeGeometry = new THREE.BoxGeometry(0.05, 1.0, 0.3);
+            const stripeMaterial = new THREE.MeshStandardMaterial({ color: 0xFF0000 });
+            
+            const leftStripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
+            leftStripe.position.set(0.25, -0.2, 0.15);
+            player.add(leftStripe);
+            
+            const rightStripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
+            rightStripe.position.set(-0.25, -0.2, 0.15);
+            player.add(rightStripe);
+            
+            // Sepatu abu-abu
+            const shoeGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.5);
+            const shoeMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
+            
+            const leftShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            leftShoe.position.set(0.25, -1.4, 0.1);
+            player.add(leftShoe);
+            
+            const rightShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            rightShoe.position.set(-0.25, -1.4, 0.1);
+            player.add(rightShoe);
+            
+            scene.add(player);
+            player.position.set(0, 1, 0);
+            player.castShadow = true;
+        }
+
+        // Terapkan skin default
+        function applyDefaultSkin() {
+            if (defaultSkinApplied) return;
+            
+            // Kepala kulit putih (sudah default)
+            // Baju oranye jas
+            const body = player.children[2];
+            body.material.color.setHex(0xFFA500); // Oranye
+            
+            // Kaos dalam putih (sudah ada)
+            const undershirt = player.children[3];
+            undershirt.material.color.setHex(0xFFFFFF); // Putih
+            
+            // Detail jaket hitam
+            const jacketDetail = player.children[4];
+            jacketDetail.material.color.setHex(0x000000); // Hitam
+            
+            // Tangan oranye
+            const leftArm = player.children[5];
+            const rightArm = player.children[6];
+            leftArm.material.color.setHex(0xFFA500); // Oranye
+            rightArm.material.color.setHex(0xFFA500); // Oranye
+            
+            defaultSkinApplied = true;
+        }
+
+        // Buat musuh dengan animasi yang lebih baik
+        function createEnemy() {
+            enemy = new THREE.Group();
+            
+            // Kepala
+            const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ color: 0x4B0082 }); // Ungu
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.7;
+            enemy.add(head);
+            
+            // Mata
+            const eyeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0xFF0000 }); // Mata merah
+            
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(0.2, 1.75, 0.4);
+            enemy.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(-0.2, 1.75, 0.4);
+            enemy.add(rightEye);
+            
+            // Mulut
+            const mouthGeometry = new THREE.BoxGeometry(0.3, 0.05, 0.1);
+            const mouthMaterial = new THREE.MeshStandardMaterial({ color: 0xFF0000 });
+            const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+            mouth.position.set(0, 1.5, 0.4);
+            enemy.add(mouth);
+            
+            // Badan (Hitam dengan aksen ungu)
+            const bodyGeometry = new THREE.BoxGeometry(1, 1.2, 0.5);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.8;
+            enemy.add(body);
+            
+            // Detail tubuh (warna ungu)
+            const detailGeometry = new THREE.BoxGeometry(1.1, 0.4, 0.1);
+            const detailMaterial = new THREE.MeshStandardMaterial({ color: 0x4B0082 });
+            const detail = new THREE.Mesh(detailGeometry, detailMaterial);
+            detail.position.set(0, 0.9, 0.25);
+            enemy.add(detail);
+            
+            // Tangan
+            const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(0.6, 0.7, 0);
+            leftArm.rotation.z = Math.PI / 6;
+            enemy.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(-0.6, 0.7, 0);
+            rightArm.rotation.z = -Math.PI / 6;
+            enemy.add(rightArm);
+            
+            // Kaki
+            const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(0.25, -0.8, 0);
+            enemy.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(-0.25, -0.8, 0);
+            enemy.add(rightLeg);
+            
+            // Sepatu
+            const shoeGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.5);
+            const shoeMaterial = new THREE.MeshStandardMaterial({ color: 0x4B0082 }); // Ungu
+            
+            const leftShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            leftShoe.position.set(0.25, -1.4, 0.1);
+            enemy.add(leftShoe);
+            
+            const rightShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            rightShoe.position.set(-0.25, -1.4, 0.1);
+            enemy.add(rightShoe);
+            
+            scene.add(enemy);
+            enemy.position.set(5, 1, 5);
+            enemy.castShadow = true;
+        }
+
+        // Setup event listeners untuk kontrol
+        function setupEventListeners() {
+            // Joystick events
+            joystick.addEventListener('mousedown', onJoystickStart);
+            joystick.addEventListener('touchstart', onJoystickStart);
+            
+            document.addEventListener('mousemove', onJoystickMove);
+            document.addEventListener('touchmove', onJoystickMove);
+            
+            document.addEventListener('mouseup', onJoystickEnd);
+            document.addEventListener('touchend', onJoystickEnd);
+            
+            // Tombol skill events
+            document.getElementById('toggle-skills').addEventListener('click', toggleSkills);
+            document.getElementById('teleport').addEventListener('click', useSkillOrTeleport);
+            
+            document.getElementById('skill-root').addEventListener('click', () => changeSkill('root'));
+            document.getElementById('skill-solar').addEventListener('click', () => changeSkill('solar'));
+            document.getElementById('skill-wave').addEventListener('click', () => changeSkill('wave'));
+            document.getElementById('skill-tornado').addEventListener('click', () => changeSkill('tornado'));
+            document.getElementById('skill-blaze').addEventListener('click', () => changeSkill('blaze'));
+            document.getElementById('skill-earthquake').addEventListener('click', () => changeSkill('earthquake'));
+            document.getElementById('skill-thunder').addEventListener('click', () => changeSkill('thunder'));
+            
+            // Restart button
+            document.getElementById('restart-btn').addEventListener('click', resetGame);
+            document.getElementById('win-restart-btn').addEventListener('click', resetGame);
+            
+            // Window resize event
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // Joystick handlers
+        function onJoystickStart(event) {
+            event.preventDefault();
+            isJoystickActive = true;
+            updateJoystickPosition(event);
+        }
+
+        function onJoystickMove(event) {
+            if (!isJoystickActive) return;
+            event.preventDefault();
+            updateJoystickPosition(event);
+        }
+
+        function onJoystickEnd() {
+            isJoystickActive = false;
+            joystickHandle.style.top = '30px';
+            joystickHandle.style.left = '30px';
+            playerVelocity.set(0, 0, 0);
+        }
+
+        function updateJoystickPosition(event) {
+            const rect = joystick.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            let clientX, clientY;
+            
+            if (event.type.includes('mouse')) {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            } else {
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            }
+            
+            const deltaX = clientX - centerX;
+            const deltaY = clientY - centerY;
+            
+            const distance = Math.min(Math.sqrt(deltaX * deltaX + deltaY * deltaY), 30);
+            const angle = Math.atan2(deltaY, deltaX);
+            
+            const handleX = 30 + distance * Math.cos(angle);
+            const handleY = 30 + distance * Math.sin(angle);
+            
+            joystickHandle.style.left = `${handleX}px`;
+            joystickHandle.style.top = `${handleY}px`;
+            
+            // Perbaikan arah gerakan - sekarang sesuai dengan arah joystick
+            const normalizedX = deltaX / 30;
+            const normalizedY = deltaY / 30;
+            
+            // Perbaikan: Gerakan maju (ke atas) menggerakkan karakter ke depan
+            // Gerakan mundur (ke bawah) menggerakkan karakter ke belakang
+            playerVelocity.x = normalizedX * playerSpeed;
+            playerVelocity.z = normalizedY * playerSpeed; // Diperbaiki: tidak ada minus
+            
+            // Update player rotation
+            if (Math.abs(normalizedX) > 0.1 || Math.abs(normalizedY) > 0.1) {
+                player.rotation.y = Math.atan2(normalizedX, normalizedY); // Diperbaiki: tidak ada minus
+            }
+        }
+
+        // Toggle skill buttons
+        function toggleSkills() {
+            const skillButtons = document.getElementById('skill-buttons');
+            if (skillButtons.style.display === 'flex') {
+                skillButtons.style.display = 'none';
+            } else {
+                skillButtons.style.display = 'flex';
+            }
+        }
+
+        // Change skill
+        function changeSkill(skill) {
+            currentSkill = skill;
+            updatePlayerAppearance();
+            document.getElementById('current-skill').textContent = `Mode: ${getSkillName(skill)}`;
+            
+            // Sembunyikan tombol skill setelah dipilih
+            document.getElementById('skill-buttons').style.display = 'none';
+            
+            // Efek ledakan saat ganti skill
+            createExplosionEffect(player.position.clone());
+            
+            // Set skill active
+            skillActive = true;
+            document.getElementById('skill-info').textContent = `Skill ${getSkillName(skill)} aktif! Klik SKILL untuk menggunakan`;
+            
+            // Update multiplayer data saat ganti skill
+            savePlayerData();
+        }
+
+        function getSkillName(skill) {
+            switch(skill) {
+                case 'root': return 'Akar';
+                case 'solar': return 'Solar';
+                case 'wave': return 'Air';
+                case 'tornado': return 'Topan';
+                case 'blaze': return 'Blaze';
+                case 'earthquake': return 'Gempa';
+                case 'thunder': return 'Halilintar';
+                default: return 'Boboiboy';
+            }
+        }
+
+        // Update player appearance based on skill
+        function updatePlayerAppearance() {
+            // Reset semua material ke default
+            const body = player.children[2];
+            const undershirt = player.children[3];
+            const jacketDetail = player.children[4];
+            const leftArm = player.children[5];
+            const rightArm = player.children[6];
+            const leftLeg = player.children[7];
+            const rightLeg = player.children[8];
+            const leftStripe = player.children[9];
+            const rightStripe = player.children[10];
+            const leftShoe = player.children[11];
+            const rightShoe = player.children[12];
+            
+            // Default appearance (normal mode)
+            let bodyColor = 0xFFA500; // Oranye (default)
+            let undershirtColor = 0xFFFFFF; // Putih (default)
+            let detailColor = 0x000000; // Hitam (default)
+            let armColor = 0xFFA500; // Oranye (default)
+            let legColor = 0x000000; // Hitam
+            let stripeColor = 0xFF0000; // Merah
+            let shoeColor = 0x808080; // Abu-abu
+            
+            switch(currentSkill) {
+                case 'root': // Mode Akar
+                    bodyColor = 0x00AA00; // Hijau
+                    undershirtColor = 0xFFFFFF; // Tetap putih
+                    detailColor = 0x000000; // Hitam
+                    armColor = 0x00AA00; // Hijau
+                    legColor = 0x006600; // Hijau tua
+                    stripeColor = 0x000000; // Hitam
+                    shoeColor = 0x006600; // Hijau tua
+                    break;
+                    
+                case 'solar': // Mode Solar
+                    bodyColor = 0xFFFFFF; // Putih
+                    undershirtColor = 0xFFFFFF; // Tetap putih
+                    detailColor = 0xFFA500; // Oranye
+                    armColor = 0xFFFFFF; // Putih
+                    legColor = 0xFFFFFF; // Putih
+                    stripeColor = 0xFFA500; // Oranye
+                    shoeColor = 0xFFA500; // Oranye
+                    break;
+                    
+                case 'wave': // Mode Ombak
+                    bodyColor = 0x00BFFF; // Biru cerah
+                    undershirtColor = 0xFFFFFF; // Tetap putih
+                    detailColor = 0x00FFFF; // Cyan
+                    armColor = 0x00BFFF; // Biru cerah
+                    legColor = 0x0000FF; // Biru
+                    stripeColor = 0x00FFFF; // Cyan
+                    shoeColor = 0x808080; // Abu-abu
+                    break;
+                    
+                case 'tornado': // Mode Topan
+                    bodyColor = 0x000080; // Biru pekat
+                    undershirtColor = 0xFFFFFF; // Tetap putih
+                    detailColor = 0xFFFFFF; // Putih
+                    armColor = 0x000080; // Biru pekat
+                    legColor = 0x000080; // Biru pekat
+                    stripeColor = 0xFFFFFF; // Putih
+                    shoeColor = 0xFFFFFF; // Putih
+                    break;
+                    
+                case 'blaze': // Mode Blaze
+                    bodyColor = 0xFF4500; // Merah-oranye
+                    undershirtColor = 0xFFFFFF; // Tetap putih
+                    detailColor = 0xFF0000; // Merah
+                    armColor = 0xFF4500; // Merah-oranye
+                    legColor = 0xFF4500; // Merah-oranye
+                    stripeColor = 0x000000; // Hitam
+                    shoeColor = 0x000000; // Hitam
+                    break;
+                    
+                case 'earthquake': // Mode Gempa
+                    bodyColor = 0x8B4513; // Coklat
+                    undershirtColor = 0xFFFFFF; // Tetap putih
+                    detailColor = 0x654321; // Coklat tua
+                    armColor = 0x8B4513; // Coklat
+                    legColor = 0x8B4513; // Coklat
+                    stripeColor = 0x654321; // Coklat tua
+                    shoeColor = 0x654321; // Coklat tua
+                    break;
+                    
+                case 'thunder': // Mode Petir
+                    bodyColor = 0xFF0000; // Merah
+                    undershirtColor = 0xFFFFFF; // Tetap putih
+                    detailColor = 0x000000; // Hitam
+                    armColor = 0xFF0000; // merah
+                    legColor = 0xFF0000; // merah
+                    stripeColor = 0x000000; // Hitam
+                    shoeColor = 0x000000; // Hitam
+                    break;
+            }
+            
+            // Apply colors
+            body.material.color.setHex(bodyColor);
+            undershirt.material.color.setHex(undershirtColor);
+            jacketDetail.material.color.setHex(detailColor);
+            leftArm.material.color.setHex(armColor);
+            rightArm.material.color.setHex(armColor);
+            leftLeg.material.color.setHex(legColor);
+            rightLeg.material.color.setHex(legColor);
+            leftStripe.material.color.setHex(stripeColor);
+            rightStripe.material.color.setHex(stripeColor);
+            leftShoe.material.color.setHex(shoeColor);
+            rightShoe.material.color.setHex(shoeColor);
+        }
+
+        // Use skill or teleport based on current mode
+        function useSkillOrTeleport() {
+            if (currentSkill === 'normal') {
+                useTeleport();
+            } else {
+                useSkill();
+            }
+        }
+
+        // Use teleport skill
+        function useTeleport() {
+            if (teleportCooldown) return;
+            
+            // Create teleport effect at current position
+            createTeleportEffect(player.position.clone());
+            
+            // Calculate position behind enemy
+            const enemyDirection = new THREE.Vector3()
+                .subVectors(enemy.position, player.position)
+                .normalize();
+            
+            const teleportDistance = 3;
+            const teleportPosition = enemy.position.clone()
+                .add(enemyDirection.clone().multiplyScalar(-teleportDistance));
+            
+            // Move player
+            player.position.copy(teleportPosition);
+            
+            // Create teleport effect at new position
+            createTeleportEffect(player.position.clone());
+            
+            // Set cooldown
+            teleportCooldown = true;
+            setTimeout(() => {
+                teleportCooldown = false;
+            }, 3000);
+        }
+
+        // Create teleport effect
+        function createTeleportEffect(position) {
+            // Lingkaran merah di tanah
+            const circleGeometry = new THREE.RingGeometry(0.5, 1.5, 32);
+            const circleMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xFF0000, 
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.7
+            });
+            const circle = new THREE.Mesh(circleGeometry, circleMaterial);
+            circle.rotation.x = -Math.PI / 2;
+            circle.position.copy(position);
+            scene.add(circle);
+            
+            // Garis petir
+            for (let i = 0; i < 100; i++) {
+                const lightningGeometry = new THREE.BufferGeometry();
+                const points = [];
+                
+                const startX = Math.random() * 2 - 1;
+                const startZ = Math.random() * 2 - 1;
+                const endX = Math.random() * 2 - 1;
+                const endZ = Math.random() * 2 - 1;
+                
+                points.push(new THREE.Vector3(startX, 0, startZ));
+                points.push(new THREE.Vector3(
+                    (startX + endX) / 2, 
+                    Math.random() * 2 + 1, 
+                    (startZ + endZ) / 2
+                ));
+                points.push(new THREE.Vector3(endX, 0, endZ));
+                
+                lightningGeometry.setFromPoints(points);
+                
+                const lightningMaterial = new THREE.LineBasicMaterial({ 
+                    color: 0xFF0000,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const lightning = new THREE.Line(lightningGeometry, lightningMaterial);
+                lightning.position.copy(position);
+                scene.add(lightning);
+                
+                // Animasi untuk menghilangkan efek
+                setTimeout(() => {
+                    scene.remove(lightning);
+                    lightning.geometry.dispose();
+                    lightning.material.dispose();
+                }, 500);
+            }
+            
+            // Animasi untuk menghilangkan lingkaran
+            setTimeout(() => {
+                scene.remove(circle);
+                circle.geometry.dispose();
+                circle.material.dispose();
+            }, 1000);
+            
+            // Efek kilat merah dan oranye di badan
+            const bodyLightningGeometry = new THREE.SphereGeometry(1.5, 8, 8);
+            const bodyLightningMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFF4500,
+                transparent: true,
+                opacity: 0.7,
+                wireframe: true
+            });
+            
+            const bodyLightning = new THREE.Mesh(bodyLightningGeometry, bodyLightningMaterial);
+            bodyLightning.position.copy(position);
+            bodyLightning.position.y += 1;
+            scene.add(bodyLightning);
+            
+            // Animasi untuk menghilangkan efek badan
+            setTimeout(() => {
+                scene.remove(bodyLightning);
+                bodyLightning.geometry.dispose();
+                bodyLightning.material.dispose();
+            }, 500);
+        }
+
+        // Create explosion effect
+        function createExplosionEffect(position) {
+            const particleCount = 30;
+            const particles = [];
+            
+            for (let i = 0; i < particleCount; i++) {
+                const geometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0xFFFF00,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const particle = new THREE.Mesh(geometry, material);
+                particle.position.copy(position);
+                
+                // Random direction
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 0.1 + Math.random() * 0.1;
+                
+                particle.userData.velocity = new THREE.Vector3(
+                    Math.cos(angle) * speed,
+                    Math.random() * 0.1,
+                    Math.sin(angle) * speed
+                );
+                
+                particle.userData.life = 1.0;
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+            
+            // Animate particles
+            const animateParticles = () => {
+                let allDead = true;
+                
+                for (const particle of particles) {
+                    if (particle.userData.life > 0) {
+                        particle.position.add(particle.userData.velocity);
+                        particle.userData.life -= 0.02;
+                        particle.material.opacity = particle.userData.life;
+                        allDead = false;
+                    }
+                }
+                
+                if (!allDead) {
+                    requestAnimationFrame(animateParticles);
+                } else {
+                    // Clean up particles
+                    for (const particle of particles) {
+                        scene.remove(particle);
+                        particle.geometry.dispose();
+                        particle.material.dispose();
+                    }
+                }
+            };
+            
+            animateParticles();
+        }
+
+        // Use current skill on enemy
+        function useSkill() {
+            switch(currentSkill) {
+                case 'root':
+                    useRootSkill();
+                    break;
+                case 'solar':
+                    useSolarSkill();
+                    break;
+                case 'wave':
+                    useWaveSkill();
+                    break;
+                case 'tornado':
+                    useTornadoSkill();
+                    break;
+                case 'blaze':
+                    useBlazeSkill();
+                    break;
+                case 'earthquake':
+                    useEarthquakeSkill();
+                    break;
+                case 'thunder':
+                    useThunderSkill();
+                    break;
+            }
+            
+            // PERBAIKAN: Skill tidak kembali ke normal setelah digunakan
+            // Hanya update info skill
+            document.getElementById('skill-info').textContent = `Skill ${getSkillName(currentSkill)} telah digunakan!`;
+        }
+
+        function useRootSkill() {
+            if (enemyBound) return;
+            
+            // Create multiple roots from different directions
+            const rootCount = 8;
+            for (let i = 0; i < rootCount; i++) {
+                // Calculate angle for each root
+                const angle = (i / rootCount) * Math.PI * 2;
+                const distance = 3;
+                
+                // Create root effect
+                const rootGeometry = new THREE.CylinderGeometry(0.2, 0.3, 5, 8);
+                const rootMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0x00AA00,
+                    wireframe: true
+                });
+                
+                const root = new THREE.Mesh(rootGeometry, rootMaterial);
+                
+                // Position root around enemy
+                root.position.set(
+                    enemy.position.x + Math.cos(angle) * distance,
+                    enemy.position.y - 2.5,
+                    enemy.position.z + Math.sin(angle) * distance
+                );
+                
+                // Rotate root towards enemy
+                root.lookAt(enemy.position);
+                root.rotateX(Math.PI / 2);
+                
+                scene.add(root);
+                
+                // Remove root after 3 seconds
+                setTimeout(() => {
+                    scene.remove(root);
+                    root.geometry.dispose();
+                    root.material.dispose();
+                }, 3000);
+            }
+            
+            // Bind enemy
+            enemyBound = true;
+            enemyBoundTime = 10;
+            
+            // Damage over time
+            const damageInterval = setInterval(() => {
+                if (enemyBound) {
+                    enemyHP -= 7;
+                    updateEnemyHP();
+                    checkWin();
+                    
+                    if (enemyHP <= 0) {
+                        enemyHP = 0;
+                        updateEnemyHP();
+                        clearInterval(damageInterval);
+                    }
+                } else {
+                    clearInterval(damageInterval);
+                }
+            }, 1000);
+            
+            // Release enemy after 10 seconds
+            setTimeout(() => {
+                enemyBound = false;
+            }, 10000);
+        }
+
+        function useSolarSkill() {
+            // Create solar beam effect - diperbesar dan diperbaiki
+            const beamGeometry = new THREE.CylinderGeometry(1.5, 1.5, 20, 40); // Lebih tebal dan lebih besar
+            const beamMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFFA500,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const beam = new THREE.Mesh(beamGeometry, beamMaterial);
+            
+            // Position beam between player and enemy
+            const direction = new THREE.Vector3()
+                .subVectors(enemy.position, player.position)
+                .normalize();
+            
+            const distance = player.position.distanceTo(enemy.position);
+            const midPoint = player.position.clone()
+                .add(direction.clone().multiplyScalar(distance / 2));
+            
+            beam.position.copy(midPoint);
+            beam.lookAt(enemy.position);
+            beam.rotateX(Math.PI / 2);
+            
+            scene.add(beam);
+            
+            // Tambahkan efek cahaya yang bersinar
+            const pointLight = new THREE.PointLight(0xFFFF00, 2, 20);
+            pointLight.position.copy(midPoint);
+            scene.add(pointLight);
+            
+            // Tambahkan partikel arus listrik di sepanjang beam
+            createElectricCurrent(beam.position, enemy.position);
+            
+            // Dorong musuh
+            const pushDirection = new THREE.Vector3()
+                .subVectors(enemy.position, player.position)
+                .normalize();
+            
+            enemy.position.add(pushDirection.multiplyScalar(2));
+            
+            // Damage enemy
+            enemyHP -= 50;
+            if (enemyHP < 0) enemyHP = 0;
+            updateEnemyHP();
+            checkWin();
+            
+            // Remove beam and light after 2 seconds
+            setTimeout(() => {
+                scene.remove(beam);
+                scene.remove(pointLight);
+                beam.geometry.dispose();
+                beam.material.dispose();
+            }, 2000);
+        }
+
+        // Create electric current effect for solar skill
+        function createElectricCurrent(start, end) {
+            const segmentCount = 50; // Lebih banyak partikel
+            const particles = [];
+            
+            for (let i = 0; i < segmentCount; i++) {
+                const t = i / segmentCount;
+                const position = new THREE.Vector3().lerpVectors(start, end, t);
+                
+                // Add random offset for electric effect
+                position.x += (Math.random() - 0.5) * 1.0; // Perbesar offset
+                position.y += (Math.random() - 0.5) * 1.0;
+                position.z += (Math.random() - 0.5) * 1.0;
+                
+                const particleGeometry = new THREE.SphereGeometry(0.15, 8, 8); // Perbesar partikel
+                const particleMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xFFFF00,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.position.copy(position);
+                particle.userData.life = 1.0;
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+            
+            // Animate particles
+            const animateParticles = () => {
+                let allDead = true;
+                
+                for (const particle of particles) {
+                    if (particle.userData.life > 0) {
+                        particle.userData.life -= 0.05;
+                        particle.material.opacity = particle.userData.life;
+                        
+                        // Add slight movement
+                        particle.position.x += (Math.random() - 0.5) * 0.1;
+                        particle.position.y += (Math.random() - 0.5) * 0.1;
+                        particle.position.z += (Math.random() - 0.5) * 0.1;
+                        
+                        allDead = false;
+                    }
+                }
+                
+                if (!allDead) {
+                    requestAnimationFrame(animateParticles);
+                } else {
+                    // Clean up particles
+                    for (const particle of particles) {
+                        scene.remove(particle);
+                        particle.geometry.dispose();
+                        particle.material.dispose();
+                    }
+                }
+            };
+            
+            animateParticles();
+        }
+
+        function useWaveSkill() {
+            // Create 3 big water balls
+            for (let i = 0; i < 3; i++) {
+                const waterBallGeometry = new THREE.SphereGeometry(0.7, 16, 16); // Ukuran besar
+                const waterBallMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x00BFFF,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                
+                const waterBall = new THREE.Mesh(waterBallGeometry, waterBallMaterial);
+                waterBall.position.copy(player.position);
+                
+                // Arah ke musuh dengan sedikit randomness
+                const direction = new THREE.Vector3()
+                    .subVectors(enemy.position, player.position)
+                    .normalize();
+                
+                direction.x += (Math.random() - 0.5) * 0.3;
+                direction.z += (Math.random() - 0.5) * 0.3;
+                direction.normalize();
+                
+                waterBall.userData.velocity = direction.clone().multiplyScalar(0.2); // Kecepatan bola air
+                waterBall.userData.life = 1.0;
+                waterBall.userData.damage = 15; // Damage per bola
+                
+                scene.add(waterBall);
+                skillEffects.push(waterBall);
+            }
+        }
+
+        function useTornadoSkill() {
+            // Create tornado effect - diperbaiki
+            const tornadoGroup = new THREE.Group();
+            tornadoGroup.position.copy(enemy.position);
+            tornadoGroup.position.y += 1;
+            
+            // Create tornado body (kerucut besar)
+            const tornadoGeometry = new THREE.ConeGeometry(2, 6, 16);
+            const tornadoMaterial = new THREE.MeshBasicMaterial({
+                color: 0x87CEEB,
+                transparent: true,
+                opacity: 0.5,
+                wireframe: false
+            });
+            
+            const tornado = new THREE.Mesh(tornadoGeometry, tornadoMaterial);
+            tornadoGroup.add(tornado);
+            
+            // Add swirling particles (abu-abu dan biru)
+            const particleCount = 20;
+            for (let i = 0; i < particleCount; i++) {
+                const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const particleMaterial = new THREE.MeshBasicMaterial({
+                    color: Math.random() > 0.5 ? 0x808080 : 0x4169E1,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                
+                // Position particles in a spiral pattern
+                const radius = Math.random() * 1.5;
+                const height = Math.random() * 5;
+                const angle = Math.random() * Math.PI * 2;
+                
+                particle.position.set(
+                    Math.cos(angle) * radius,
+                    height,
+                    Math.sin(angle) * radius
+                );
+                
+                particle.userData.angle = angle;
+                particle.userData.speed = 0.1 + Math.random() * 0.1;
+                particle.userData.radius = radius;
+                particle.userData.height = height;
+                
+                tornadoGroup.add(particle);
+            }
+            
+            scene.add(tornadoGroup);
+            
+            // Animate tornado
+            const animateTornado = () => {
+                tornadoGroup.rotation.y += 0.1;
+                
+                // Animate particles in spiral
+                tornadoGroup.children.forEach((child, index) => {
+                    if (index > 0) { // Skip the tornado body
+                        child.userData.angle += child.userData.speed;
+                        child.position.x = Math.cos(child.userData.angle) * child.userData.radius;
+                        child.position.z = Math.sin(child.userData.angle) * child.userData.radius;
+                        
+                        // Move particles upward
+                        child.position.y += 0.05;
+                        if (child.position.y > 5) {
+                            child.position.y = 0;
+                        }
+                    }
+                });
+                
+                requestAnimationFrame(animateTornado);
+            };
+            
+            animateTornado();
+            
+            // Push enemy back
+            const pushDirection = new THREE.Vector3()
+                .subVectors(enemy.position, player.position)
+                .normalize();
+            
+            enemy.position.add(pushDirection.multiplyScalar(3));
+            
+            // Damage enemy
+            enemyHP -= 30;
+            if (enemyHP < 0) enemyHP = 0;
+            updateEnemyHP();
+            checkWin();
+            
+            // Remove tornado after 3 seconds
+            setTimeout(() => {
+                scene.remove(tornadoGroup);
+                tornadoGroup.children.forEach(child => {
+                    child.geometry.dispose();
+                    child.material.dispose();
+                });
+            }, 3000);
+        }
+
+        function useBlazeSkill() {
+            // Create fire effect on enemy - diperbaiki
+            const fireGroup = new THREE.Group();
+            fireGroup.position.copy(enemy.position);
+            
+            // Create multiple fire balls around enemy
+            const fireBallCount = 12;
+            const fireBalls = [];
+            
+            for (let i = 0; i < fireBallCount; i++) {
+                const fireGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+                const fireMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xFF4500,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const fireBall = new THREE.Mesh(fireGeometry, fireMaterial);
+                
+                // Position fire balls in a circle around enemy
+                const angle = (i / fireBallCount) * Math.PI * 2;
+                const radius = 1.5;
+                
+                fireBall.position.set(
+                    Math.cos(angle) * radius,
+                    Math.random() * 2,
+                    Math.sin(angle) * radius
+                );
+                
+                fireBall.userData.angle = angle;
+                fireBall.userData.radius = radius;
+                fireBall.userData.pulseSpeed = 0.05 + Math.random() * 0.05;
+                fireBall.userData.pulsePhase = Math.random() * Math.PI * 2;
+                
+                fireGroup.add(fireBall);
+                fireBalls.push(fireBall);
+            }
+            
+            scene.add(fireGroup);
+            
+            // Animate fire balls
+            const animateFire = () => {
+                fireBalls.forEach(fireBall => {
+                    // Pulsating effect
+                    const scale = 1 + Math.sin(fireBall.userData.pulsePhase) * 0.3;
+                    fireBall.scale.set(scale, scale, scale);
+                    fireBall.userData.pulsePhase += fireBall.userData.pulseSpeed;
+                    
+                    // Rotate around enemy
+                    fireBall.userData.angle += 0.02;
+                    fireBall.position.x = Math.cos(fireBall.userData.angle) * fireBall.userData.radius;
+                    fireBall.position.z = Math.sin(fireBall.userData.angle) * fireBall.userData.radius;
+                    
+                    // Random vertical movement
+                    fireBall.position.y += (Math.random() - 0.5) * 0.1;
+                    fireBall.position.y = Math.max(0.5, Math.min(2.5, fireBall.position.y));
+                });
+                
+                requestAnimationFrame(animateFire);
+            };
+            
+            animateFire();
+            
+            // Set enemy on fire
+            enemyOnFire = true;
+            enemyFireTime = 5;
+            
+            // Damage over time
+            const damageInterval = setInterval(() => {
+                if (enemyOnFire) {
+                    enemyHP -= 10;
+                    updateEnemyHP();
+                    checkWin();
+                    
+                    if (enemyHP <= 0) {
+                        enemyHP = 0;
+                        updateEnemyHP();
+                        clearInterval(damageInterval);
+                    }
+                } else {
+                    clearInterval(damageInterval);
+                }
+            }, 1000);
+            
+            // Remove fire after 5 seconds
+            setTimeout(() => {
+                scene.remove(fireGroup);
+                fireGroup.children.forEach(child => {
+                    child.geometry.dispose();
+                    child.material.dispose();
+                });
+                enemyOnFire = false;
+            }, 5000);
+        }
+
+        function useEarthquakeSkill() {
+            // Create earthquake wall in front of player
+            const wallGeometry = new THREE.BoxGeometry(6, 4, 1);
+            const wallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x8B4513, // Brown color
+                roughness: 0.8,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            earthquakeWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            
+            // Position wall in front of player
+            const direction = new THREE.Vector3()
+                .subVectors(enemy.position, player.position)
+                .normalize();
+            
+            earthquakeWall.position.copy(player.position);
+            earthquakeWall.position.add(direction.multiplyScalar(4));
+            earthquakeWall.position.y = 2; // Center at height 2
+            
+            // Rotate wall to face enemy
+            earthquakeWall.lookAt(enemy.position);
+            
+            scene.add(earthquakeWall);
+            
+            // Set earthquake wall time
+            earthquakeWallTime = 10;
+            
+            // Add particle effect for earthquake
+            createEarthquakeEffect(earthquakeWall.position);
+            
+            // Remove wall after 10 seconds
+            setTimeout(() => {
+                if (earthquakeWall) {
+                    scene.remove(earthquakeWall);
+                    earthquakeWall.geometry.dispose();
+                    earthquakeWall.material.dispose();
+                    earthquakeWall = null;
+                }
+            }, 10000);
+        }
+
+        function createEarthquakeEffect(position) {
+            const particleCount = 50;
+            const particles = [];
+            
+            for (let i = 0; i < particleCount; i++) {
+                const geometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0x8B4513,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const particle = new THREE.Mesh(geometry, material);
+                particle.position.copy(position);
+                
+                // Random direction
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 0.05 + Math.random() * 0.05;
+                
+                particle.userData.velocity = new THREE.Vector3(
+                    Math.cos(angle) * speed,
+                    Math.random() * 0.1,
+                    Math.sin(angle) * speed
+                );
+                
+                particle.userData.life = 1.0;
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+            
+            // Animate particles
+            const animateParticles = () => {
+                let allDead = true;
+                
+                for (const particle of particles) {
+                    if (particle.userData.life > 0) {
+                        particle.position.add(particle.userData.velocity);
+                        particle.userData.life -= 0.02;
+                        particle.material.opacity = particle.userData.life;
+                        allDead = false;
+                    }
+                }
+                
+                if (!allDead) {
+                    requestAnimationFrame(animateParticles);
+                } else {
+                    // Clean up particles
+                    for (const particle of particles) {
+                        scene.remove(particle);
+                        particle.geometry.dispose();
+                        particle.material.dispose();
+                    }
+                }
+            };
+            
+            animateParticles();
+        }
+
+        // Skill Petir Baru
+        function useThunderSkill() {
+            // Efek kilat yang menyambar musuh
+            createThunderEffect(enemy.position);
+            
+            // Efek tanah menjulang di sekitar musuh
+            createGroundSpikes(enemy.position);
+            
+            // Efek bekas gosong di tanah
+            createBurnMark(enemy.position);
+            
+            // Damage musuh
+            enemyHP -= 75;
+            if (enemyHP < 0) enemyHP = 0;
+            updateEnemyHP();
+            checkWin();
+        }
+
+        function createThunderEffect(position) {
+            // Buat beberapa kilat dari langit ke musuh
+            const lightningCount = 5;
+            
+            for (let i = 0; i < lightningCount; i++) {
+                setTimeout(() => {
+                    // Buat kilat utama
+                    const startPos = new THREE.Vector3(
+                        position.x + (Math.random() - 0.5) * 5,
+                        position.y + 10,
+                        position.z + (Math.random() - 0.5) * 5
+                    );
+                    
+                    const endPos = position.clone();
+                    
+                    // Buat geometri kilat dengan beberapa segmen untuk efek zigzag
+                    const segments = 8;
+                    const points = [startPos];
+                    
+                    for (let j = 1; j < segments; j++) {
+                        const t = j / segments;
+                        const segmentPos = new THREE.Vector3().lerpVectors(startPos, endPos, t);
+                        
+                        // Tambahkan randomness untuk efek zigzag
+                        segmentPos.x += (Math.random() - 0.5) * 1.5;
+                        segmentPos.z += (Math.random() - 0.5) * 1.5;
+                        
+                        points.push(segmentPos);
+                    }
+                    
+                    points.push(endPos);
+                    
+                    const lightningGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const lightningMaterial = new THREE.LineBasicMaterial({
+                        color: 0x00FFFF,
+                        linewidth: 2
+                    });
+                    
+                    const lightning = new THREE.Line(lightningGeometry, lightningMaterial);
+                    scene.add(lightning);
+                    
+                    // Tambahkan efek cahaya di titik sambaran
+                    const pointLight = new THREE.PointLight(0x00FFFF, 2, 10);
+                    pointLight.position.copy(endPos);
+                    scene.add(pointLight);
+                    
+                    // Hapus efek setelah beberapa saat
+                    setTimeout(() => {
+                        scene.remove(lightning);
+                        scene.remove(pointLight);
+                        lightningGeometry.dispose();
+                        lightningMaterial.dispose();
+                    }, 300);
+                }, i * 200); // Staggered lightning strikes
+            }
+        }
+
+        function createGroundSpikes(position) {
+            // Buat tanah menjulang di sekitar musuh
+            const spikeCount = 8;
+            const spikes = [];
+            
+            for (let i = 0; i < spikeCount; i++) {
+                const angle = (i / spikeCount) * Math.PI * 2;
+                const distance = 2;
+                
+                const spikeGeometry = new THREE.ConeGeometry(0.3, 2, 8);
+                const spikeMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
+                
+                spike.position.set(
+                    position.x + Math.cos(angle) * distance,
+                    1, // Setengah tinggi
+                    position.z + Math.sin(angle) * distance
+                );
+                
+                scene.add(spike);
+                spikes.push(spike);
+                
+                // Animasi munculnya spike
+                const targetY = position.y + 1;
+                spike.position.y = position.y - 1; // Mulai dari bawah tanah
+                
+                // Animate spike rising
+                const riseInterval = setInterval(() => {
+                    spike.position.y += 0.1;
+                    if (spike.position.y >= targetY) {
+                        clearInterval(riseInterval);
+                    }
+                }, 30);
+            }
+            
+            // Hapus spikes setelah beberapa detik
+            setTimeout(() => {
+                spikes.forEach(spike => {
+                    scene.remove(spike);
+                    spike.geometry.dispose();
+                    spike.material.dispose();
+                });
+            }, 5000);
+        }
+
+        function createBurnMark(position) {
+            // Buat bekas gosong di tanah
+            const burnGeometry = new THREE.CircleGeometry(2, 32);
+            const burnMaterial = new THREE.MeshBasicMaterial({
+                color: 0x333333,
+                side: THREE.DoubleSide
+            });
+            const burn = new THREE.Mesh(burnGeometry, burnMaterial);
+            burn.rotation.x = -Math.PI / 2;
+            burn.position.set(position.x, 0.01, position.z);
+            scene.add(burn);
+            
+            // Tambahkan efek asap
+            createSmokeEffect(position);
+            
+            // Hapus bekas gosong setelah beberapa detik
+            setTimeout(() => {
+                scene.remove(burn);
+                burn.geometry.dispose();
+                burn.material.dispose();
+            }, 10000);
+        }
+
+        function createSmokeEffect(position) {
+            const smokeCount = 20;
+            const smokeParticles = [];
+            
+            for (let i = 0; i < smokeCount; i++) {
+                const smokeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const smokeMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x555555,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                
+                const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial);
+                smoke.position.copy(position);
+                
+                // Random direction
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 0.01 + Math.random() * 0.02;
+                
+                smoke.userData.velocity = new THREE.Vector3(
+                    Math.cos(angle) * speed,
+                    Math.random() * 0.05 + 0.02, // Upward velocity
+                    Math.sin(angle) * speed
+                );
+                
+                smoke.userData.life = 1.0;
+                
+                scene.add(smoke);
+                smokeParticles.push(smoke);
+            }
+            
+            // Animate smoke particles
+            const animateSmoke = () => {
+                let allDead = true;
+                
+                for (const smoke of smokeParticles) {
+                    if (smoke.userData.life > 0) {
+                        smoke.position.add(smoke.userData.velocity);
+                        smoke.userData.life -= 0.01;
+                        smoke.material.opacity = smoke.userData.life * 0.7;
+                        
+                        // Grow slightly
+                        smoke.scale.multiplyScalar(1.01);
+                        
+                        allDead = false;
+                    }
+                }
+                
+                if (!allDead) {
+                    requestAnimationFrame(animateSmoke);
+                } else {
+                    // Clean up smoke particles
+                    for (const smoke of smokeParticles) {
+                        scene.remove(smoke);
+                        smoke.geometry.dispose();
+                        smoke.material.dispose();
+                    }
+                }
+            };
+            
+            animateSmoke();
+        }
+
+        function updateEnemyHP() {
+            document.getElementById('enemy-hp').textContent = `HP Musuh: ${enemyHP}`;
+        }
+
+        function updatePlayerHP() {
+            document.getElementById('player-hp').textContent = `HP Anda: ${playerHP}`;
+        }
+
+        function updateEnemyStatus() {
+            let status = "Normal";
+            if (enemyBound) status = "Terikat Akar";
+            if (enemyOnFire) status = "Terbakar";
+            if (enemySlowed) status = "Melambat";
+            
+            document.getElementById('enemy-status').textContent = `Status Musuh: ${status}`;
+        }
+
+        function checkGameOver() {
+            if (playerHP <= 0 && !gameOver) {
+                gameOver = true;
+                document.getElementById('game-over').style.display = 'block';
+            }
+        }
+
+        function checkWin() {
+            if (enemyHP <= 0 && !gameWin) {
+                gameWin = true;
+                document.getElementById('game-win').style.display = 'block';
+            }
+        }
+
+        function resetGame() {
+            // Reset semua variabel game
+            playerHP = 100;
+            enemyHP = 500;
+            currentSkill = 'normal';
+            gameOver = false;
+            gameWin = false;
+            
+            // Reset posisi
+            player.position.set(0, 1, 0);
+            enemy.position.set(5, 1, 5);
+            
+            // Reset UI
+            updatePlayerHP();
+            updateEnemyHP();
+            updateEnemyStatus();
+            document.getElementById('current-skill').textContent = 'Mode: Normal';
+            document.getElementById('skill-info').textContent = 'Klik 🆙 untuk memilih elemen, lalu klik SKILL untuk menggunakan skill';
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('game-win').style.display = 'none';
+            
+            // Reset player appearance
+            applyDefaultSkin();
+            
+            // Reset status efek
+            enemyBound = false;
+            enemyOnFire = false;
+            enemySlowed = false;
+            skillActive = false;
+            
+            // Hapus earthquake wall jika ada
+            if (earthquakeWall) {
+                scene.remove(earthquakeWall);
+                earthquakeWall.geometry.dispose();
+                earthquakeWall.material.dispose();
+                earthquakeWall = null;
+            }
+            
+            // Hapus semua efek skill yang aktif
+            skillEffects.forEach(effect => {
+                scene.remove(effect);
+                effect.geometry.dispose();
+                effect.material.dispose();
+            });
+            skillEffects = [];
+            
+            // Reset multiplayer data
+            savePlayerData();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Animate enemy movement dengan animasi yang lebih baik
+        function animateEnemy() {
+            if (enemyBound) return;
+            
+            // Update slow time
+            if (enemySlowed) {
+                enemySlowTime -= 0.016; // Assuming 60fps
+                if (enemySlowTime <= 0) {
+                    enemySlowed = false;
+                }
+            }
+            
+            // Simple AI: move towards player
+            const direction = new THREE.Vector3()
+                .subVectors(player.position, enemy.position)
+                .normalize();
+            
+            // Move slower when bound or slowed
+            let speed = 0.02;
+            if (enemyBound) speed = 0.005;
+            if (enemySlowed) speed = 0.005;
+            
+            // Check collision with earthquake wall
+            let canMove = true;
+            if (earthquakeWall) {
+                const wallPosition = earthquakeWall.position;
+                const wallDistance = enemy.position.distanceTo(wallPosition);
+                
+                // Jika musuh terlalu dekat dengan tembok, jangan biarkan melewati
+                if (wallDistance < 3) {
+                    // Hitung vektor dari tembok ke musuh
+                    const toEnemy = new THREE.Vector3().subVectors(enemy.position, wallPosition).normalize();
+                    
+                    // Hitung dot product dengan normal tembok (arah hadap tembok)
+                    const wallNormal = new THREE.Vector3(0, 0, -1).applyQuaternion(earthquakeWall.quaternion);
+                    const dotProduct = toEnemy.dot(wallNormal);
+                    
+                    // Jika musuh berada di depan tembok, jangan biarkan melewati
+                    if (dotProduct > 0.5) {
+                        canMove = false;
+                    }
+                }
+            }
+            
+            if (canMove) {
+                enemy.position.x += direction.x * speed;
+                enemy.position.z += direction.z * speed;
+            }
+            
+            // Rotate enemy to face player
+            enemy.rotation.y = Math.atan2(
+                player.position.x - enemy.position.x,
+                player.position.z - enemy.position.z
+            );
+            
+            // Animasi berjalan musuh yang lebih smooth
+            enemyAnimationTime += 0.05;
+            
+            // Animasi lengan
+            enemy.children[4].rotation.x = Math.sin(enemyAnimationTime) * 0.5; // Left arm
+            enemy.children[5].rotation.x = Math.sin(enemyAnimationTime + Math.PI) * 0.5; // Right arm
+            
+            // Animasi kaki - melangkah bergantian
+            enemy.children[6].rotation.x = Math.sin(enemyAnimationTime) * 0.5; // Left leg
+            enemy.children[7].rotation.x = Math.sin(enemyAnimationTime + Math.PI) * 0.5; // Right leg
+            
+            // Animasi mulut - berbicara/menggeram
+            enemy.children[2].scale.y = 1 + Math.sin(enemyAnimationTime * 2) * 0.5;
+            
+            // Serangan musuh
+            const currentTime = clock.getElapsedTime();
+            if (currentTime - lastEnemyAttackTime > enemyAttackInterval) {
+                // Cek jarak untuk serangan
+                const distanceToPlayer = player.position.distanceTo(enemy.position);
+                if (distanceToPlayer < 3) {
+                    playerHP -= enemyAttackDamage;
+                    updatePlayerHP();
+                    checkGameOver();
+                    lastEnemyAttackTime = currentTime;
+                    
+                    // Efek serangan musuh
+                    createEnemyAttackEffect();
+                }
+            }
+        }
+
+        function createEnemyAttackEffect() {
+            // Efek serangan musuh - kilatan merah
+            const attackGeometry = new THREE.SphereGeometry(1, 8, 8);
+            const attackMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFF0000,
+                transparent: true,
+                opacity: 0.7,
+                wireframe: true
+            });
+            
+            const attackEffect = new THREE.Mesh(attackGeometry, attackMaterial);
+            attackEffect.position.copy(enemy.position);
+            scene.add(attackEffect);
+            
+            // Animasi serangan
+            let scale = 1;
+            const animateAttack = () => {
+                scale += 0.1;
+                attackEffect.scale.set(scale, scale, scale);
+                attackMaterial.opacity -= 0.05;
+                
+                if (attackMaterial.opacity > 0) {
+                    requestAnimationFrame(animateAttack);
+                } else {
+                    scene.remove(attackEffect);
+                    attackGeometry.dispose();
+                    attackMaterial.dispose();
+                }
+            };
+            
+            animateAttack();
+        }
+
+        // Update skill effects
+        function updateSkillEffects() {
+            for (let i = skillEffects.length - 1; i >= 0; i--) {
+                const effect = skillEffects[i];
+                
+                if (effect.userData.life > 0) {
+                    effect.position.add(effect.userData.velocity);
+                    effect.userData.life -= 0.01;
+                    effect.material.opacity = effect.userData.life;
+                    
+                    // Check collision with enemy
+                    if (effect.position.distanceTo(enemy.position) < 1.5) {
+                        // Kena musuh
+                        enemyHP -= effect.userData.damage;
+                        updateEnemyHP();
+                        checkWin();
+                        
+                        // Terapkan efek slow
+                        enemySlowed = true;
+                        enemySlowTime = 4.5; // 4.5 detik
+                        
+                        // Hapus bola air
+                        effect.userData.life = 0;
+                    }
+                } else {
+                    scene.remove(effect);
+                    effect.geometry.dispose();
+                    effect.material.dispose();
+                    skillEffects.splice(i, 1);
+                }
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            if (gameOver || gameWin) return;
+            
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            
+            // Update player position
+            if (isJoystickActive) {
+                player.position.x += playerVelocity.x;
+                player.position.z += playerVelocity.z;
+                
+                // Batasi pergerakan player dalam area tanah
+                player.position.x = Math.max(-14, Math.min(14, player.position.x));
+                player.position.z = Math.max(-14, Math.min(14, player.position.z));
+                
+                // Animasi berjalan yang lebih smooth
+                playerAnimationTime += 0.1;
+                
+                // Animasi lengan
+                player.children[5].rotation.x = Math.sin(playerAnimationTime) * 0.5; // Left arm
+                player.children[6].rotation.x = Math.sin(playerAnimationTime + Math.PI) * 0.5; // Right arm
+                
+                // Animasi kaki - melangkah bergantian
+                player.children[7].rotation.x = Math.sin(playerAnimationTime) * 0.5; // Left leg
+                player.children[8].rotation.x = Math.sin(playerAnimationTime + Math.PI) * 0.5; // Right leg
+            } else {
+                // Reset animasi saat tidak bergerak
+                player.children[5].rotation.x = 0; // Left arm
+                player.children[6].rotation.x = 0; // Right arm
+                player.children[7].rotation.x = 0; // Left leg
+                player.children[8].rotation.x = 0; // Right leg
+            }
+            
+            // Update enemy
+            animateEnemy();
+            
+            // Update skill effects
+            updateSkillEffects();
+            
+            // Update enemy status
+            updateEnemyStatus();
+            
+            // Update earthquake wall time
+            if (earthquakeWall) {
+                earthquakeWallTime -= 0.016;
+                if (earthquakeWallTime <= 0) {
+                    scene.remove(earthquakeWall);
+                    earthquakeWall.geometry.dispose();
+                    earthquakeWall.material.dispose();
+                    earthquakeWall = null;
+                }
+            }
+            
+            // Update camera to follow player
+            camera.position.x = player.position.x;
+            camera.position.z = player.position.z + 10;
+            camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+            
+            renderer.render(scene, camera);
+        }
+
+        // Start the game
+        init();
+    </script>
+</body>
+</html>
