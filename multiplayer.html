@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game 7 Elemental 3D - Diperbarui</title>
+    <title>Game 7 Elemental 3D - Mabar Diperbarui</title>
     
     <!-- Firebase SDK untuk MABAR -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     
     <style>
-        /* CSS yang sama seperti sebelumnya */
         body {
             margin: 0;
             padding: 0;
@@ -200,21 +199,10 @@
             z-index: 100;
             max-width: 200px;
         }
-        #connection-status {
-            position: absolute;
-            top: 220px;
-            left: 20px;
-            color: white;
-            font-size: 14px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 5px 10px;
-            border-radius: 5px;
-            z-index: 100;
-        }
     </style>
 </head>
 <body>
-    <div id="game-title">GAME BY TAHER - VERSI DIPERBARUI</div>
+    <div id="game-title">TAHER X ELEMENTAL</div>
     <div id="ui">
         <div id="joystick">
             <div id="joystick-handle"></div>
@@ -234,24 +222,23 @@
         <div id="skill-thunder" class="skill-btn" title="Elemen Halilintar">⚡</div>
     </div>
     <div id="enemy-hp">💜 500</div>
-    <div id="player-hp">❤️ 200</div>
-    <div id="enemy-status">Normal</div>
-    <div id="current-skill">Biasa</div>
+    <div id="player-hp">❤️ 100</div>
+    <div id="enemy-status"> musuh</div>
+    <div id="current-skill"> Boboiboy KW</div>
     
     <!-- UI untuk MABAR -->
-    <div id="multiplayer-info">Player:<span id="player-count">1</span></div>
-    <div id="multiplayer-status">Menunggu pemain...</div>
-    <div id="connection-status">Memeriksa...</div>
+    <div id="multiplayer-info">Pemain Online: <span id="player-count">1</span></div>
+    <div id="multiplayer-status">MABAR: Menunggu pemain...</div>
 
     <div id="game-over">
-        <h2>GAME OVER</h2>
-        <p>Anda telah dikalahkan!</p>
+        <h2>DEFFEAT❌</h2>
+        <p>Kalah Mengenaskan by @Taher</p>
         <button id="restart-btn">Mulai Ulang</button>
     </div>
 
     <div id="game-win">
-        <h2>MENANG!</h2>
-        <p>Anda telah mengalahkan musuh!</p>
+        <h2>VICTORY 🎉</h2>
+        <p>Menang Dengan Gaya By @Taher</p>
         <button id="win-restart-btn">Main Lagi</button>
     </div>
 
@@ -277,12 +264,9 @@
         let playerId;
         let playersRef;
         let currentPlayerRef;
-        let enemyRef;
+        let gameStateRef;
         let otherPlayers = {};
         let otherPlayerObjects = {};
-        let isOnline = false;
-        let connectionCheckInterval;
-        let playerDataUpdateInterval;
 
         // ========== VARIABEL GAME ==========
         let scene, camera, renderer;
@@ -294,7 +278,7 @@
         let playerSpeed = 0.1;
         let currentSkill = 'normal';
         let enemyHP = 500;
-        let playerHP = 200; // Diubah menjadi 200
+        let playerHP = 100;
         let clock = new THREE.Clock();
         let teleportCooldown = false;
         let skillEffects = [];
@@ -306,8 +290,8 @@
         let enemySlowTime = 0;
         let skillActive = false;
         let enemyAttackCooldown = 0;
-        let enemyAttackDamage = 10; // Ditingkatkan dari 5
-        let enemyAttackInterval = 0.7; // Dikurangi dari 1 detik
+        let enemyAttackDamage = 5;
+        let enemyAttackInterval = 1; // detik
         let lastEnemyAttackTime = 0;
         let gameOver = false;
         let gameWin = false;
@@ -316,251 +300,261 @@
         let earthquakeWall = null;
         let earthquakeWallTime = 0;
         let defaultSkinApplied = false;
-        let playerCounter = 1;
+        let playerName = "Player " + Math.floor(Math.random() * 1000);
 
-        // ========== FUNGSI MULTIPLAYER ==========
+        // // ========== FUNGSI MULTIPLAYER ==========
+
+// Generate unique player ID
+function generatePlayerId() {
+    return 'player_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+}
+
+// Initialize multiplayer system
+function initMultiplayer() {
+    playerId = generatePlayerId();
+    playersRef = database.ref('players');
+    gameStateRef = database.ref('gameState');
+    currentPlayerRef = playersRef.child(playerId);
+    
+    console.log('Player ID:', playerId);
+    document.getElementById('multiplayer-status').textContent = 'MABAR: Terhubung! ID: ' + playerName;
+    
+    // Hapus semua data pemain yang ada sebelumnya (reset room)
+    playersRef.remove();
+    gameStateRef.remove();
+    
+    // Simpan data pemain awal
+    savePlayerData();
+    
+    // Update posisi pemain secara berkala
+    setInterval(savePlayerData, 100);
+    
+    // Listen untuk perubahan data pemain lain
+    playersRef.on('value', (snapshot) => {
+        const players = snapshot.val();
+        renderOtherPlayers(players);
         
-        // Generate unique player ID
-        function generatePlayerId() {
-            return 'player_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        // Jika tidak ada pemain lain, hapus gameState
+        if (!players || Object.keys(players).length === 0) {
+            gameStateRef.remove();
         }
-
-        // Generate player name
-        function generatePlayerName() {
-            const playerNumber = playerCounter++;
-            return 'Player ' + (playerNumber < 10 ? '0' + playerNumber : playerNumber);
-        }
-
-        // Check internet connection
-        function checkConnection() {
-            const connectionStatus = document.getElementById('connection-status');
+    });
+    
+    // Listen untuk perubahan state game (musuh, kemenangan, kekalahan)
+    gameStateRef.on('value', (snapshot) => {
+        const gameState = snapshot.val();
+        if (gameState) {
+            // Update posisi musuh
+            if (gameState.enemyPosition) {
+                enemy.position.set(
+                    gameState.enemyPosition.x,
+                    gameState.enemyPosition.y,
+                    gameState.enemyPosition.z
+                );
+            }
             
-            // Test Firebase connection
-            const connectedRef = database.ref(".info/connected");
-            connectedRef.on("value", function(snap) {
-                if (snap.val() === true) {
-                    isOnline = true;
-                    connectionStatus.textContent = 'Online';
-                    connectionStatus.style.backgroundColor = 'rgba(0, 150, 0, 0.5)';
-                    
-                    // Initialize multiplayer if not already done
-                    if (!playersRef) {
-                        initMultiplayer();
-                    }
-                } else {
-                    isOnline = false;
-                    connectionStatus.textContent = 'Offline';
-                    connectionStatus.style.backgroundColor = 'rgba(150, 0, 0, 0.5)';
-                    
-                    // Clear multiplayer data
-                    clearOtherPlayers();
-                    document.getElementById('multiplayer-status').textContent = 'MABAR: OFFLINE - Periksa koneksi internet';
-                    document.getElementById('player-count').textContent = '1';
-                }
-            });
+            // Update HP musuh
+            if (gameState.enemyHP !== undefined) {
+                enemyHP = gameState.enemyHP;
+                updateEnemyHP();
+            }
+            
+            // Update status game
+            if (gameState.gameOver && !gameOver) {
+                gameOver = true;
+                document.getElementById('game-over').style.display = 'block';
+            }
+            
+            if (gameState.gameWin && !gameWin) {
+                gameWin = true;
+                document.getElementById('game-win').style.display = 'block';
+            }
         }
+    });
+    
+    // Hapus data pemain saat keluar
+    window.addEventListener('beforeunload', () => {
+        currentPlayerRef.remove();
+        // Jika ini pemain terakhir, hapus gameState juga
+        playersRef.once('value').then((snapshot) => {
+            const players = snapshot.val();
+            if (!players || Object.keys(players).length <= 1) {
+                gameStateRef.remove();
+            }
+        });
+    });
+    
+    // Handle disconnect - hapus data pemain
+    currentPlayerRef.onDisconnect().remove();
+    
+    // Jika tidak ada pemain lain setelah beberapa detik, hapus gameState
+    setTimeout(() => {
+        playersRef.once('value').then((snapshot) => {
+            const players = snapshot.val();
+            if (!players || Object.keys(players).length === 0) {
+                gameStateRef.remove();
+            }
+        });
+    }, 5000);
+}
 
-        // Initialize multiplayer system
-        function initMultiplayer() {
-            if (!isOnline) {
-                document.getElementById('multiplayer-status').textContent = 'MABAR: OFFLINE - Periksa koneksi internet';
+// Simpan data pemain ke Firebase
+function savePlayerData() {
+    if (!player || !currentPlayerRef || gameOver || gameWin) return;
+    
+    const playerData = {
+        name: playerName,
+        x: player.position.x,
+        y: player.position.y,
+        z: player.position.z,
+        rotationY: player.rotation.y,
+        element: currentSkill,
+        timestamp: Date.now()
+    };
+    
+    currentPlayerRef.set(playerData);
+}
+
+// Simpan state game ke Firebase
+function saveGameState() {
+    if (!gameStateRef || gameOver || gameWin) return;
+    
+    const gameState = {
+        enemyPosition: {
+            x: enemy.position.x,
+            y: enemy.position.y,
+            z: enemy.position.z
+        },
+        enemyHP: enemyHP,
+        gameOver: gameOver,
+        gameWin: gameWin,
+        timestamp: Date.now()
+    };
+    
+    gameStateRef.set(gameState);
+}
+
+// Render pemain lain di layar
+function renderOtherPlayers(players) {
+    if (!players) {
+        // Jika tidak ada pemain lain, hapus semua objek pemain lain
+        clearOtherPlayers();
+        updatePlayerCount();
+        return;
+    }
+    
+    // Hapus pemain yang sudah tidak aktif (lebih dari 5 detik)
+    const currentTime = Date.now();
+    Object.keys(otherPlayerObjects).forEach(playerKey => {
+        if (!players[playerKey] || (currentTime - players[playerKey].timestamp) > 5000) {
+            if (otherPlayerObjects[playerKey]) {
+                scene.remove(otherPlayerObjects[playerKey]);
+                delete otherPlayerObjects[playerKey];
+                delete otherPlayers[playerKey];
+            }
+        }
+    });
+    
+    // Tambah atau update pemain lain
+    Object.keys(players).forEach(playerKey => {
+        if (playerKey !== playerId) {
+            const playerData = players[playerKey];
+            
+            // Skip jika data terlalu lama
+            if (currentTime - playerData.timestamp > 5000) {
                 return;
             }
             
-            playerId = generatePlayerId();
-            playersRef = database.ref('players');
-            enemyRef = database.ref('enemy');
-            currentPlayerRef = playersRef.child(playerId);
-            
-            console.log('Player ID:', playerId);
-            document.getElementById('multiplayer-status').textContent = 'MABAR: Terhubung! ID: ' + playerId.substring(0, 10) + '...';
-            
-            // Simpan data pemain awal
-            savePlayerData();
-            
-            // Update posisi pemain secara berkala (5ms untuk real-time)
-            playerDataUpdateInterval = setInterval(savePlayerData, 5);
-            
-            // Listen untuk perubahan data pemain lain
-            playersRef.on('value', (snapshot) => {
-                const players = snapshot.val();
-                renderOtherPlayers(players);
-            });
-            
-            // Listen untuk perubahan data musuh
-            enemyRef.on('value', (snapshot) => {
-                const enemyData = snapshot.val();
-                if (enemyData) {
-                    updateEnemyFromServer(enemyData);
-                }
-            });
-            
-            // Simpan data musuh awal
-            saveEnemyData();
-            
-            // Update data musuh secara berkala
-            setInterval(saveEnemyData, 50);
-            
-            // Hapus data pemain saat keluar
-            window.addEventListener('beforeunload', () => {
-                cleanupMultiplayer();
-            });
-            
-            // Handle disconnect
-            currentPlayerRef.onDisconnect().remove();
-            enemyRef.onDisconnect().remove();
-        }
-
-        // Cleanup multiplayer data
-        function cleanupMultiplayer() {
-            if (currentPlayerRef) {
-                currentPlayerRef.remove();
+            if (!otherPlayerObjects[playerKey]) {
+                // Buat karakter baru untuk pemain lain
+                createOtherPlayer(playerKey, playerData);
+            } else {
+                // Update posisi dan rotasi pemain yang sudah ada
+                updateOtherPlayer(playerKey, playerData);
             }
-            if (enemyRef) {
-                enemyRef.remove();
-            }
-            if (playerDataUpdateInterval) {
-                clearInterval(playerDataUpdateInterval);
-            }
-            if (connectionCheckInterval) {
-                clearInterval(connectionCheckInterval);
-            }
+            
+            otherPlayers[playerKey] = playerData;
         }
+    });
+    
+    // Update jumlah pemain online
+    updatePlayerCount();
+}
 
-        // Simpan data pemain ke Firebase
-        function savePlayerData() {
-            if (!player || !currentPlayerRef || gameOver || gameWin || !isOnline) return;
-            
-            const playerData = {
-                name: generatePlayerName(),
-                x: player.position.x,
-                y: player.position.y,
-                z: player.position.z,
-                rotationY: player.rotation.y,
-                element: currentSkill,
-                hp: playerHP,
-                timestamp: Date.now()
-            };
-            
-            currentPlayerRef.set(playerData);
-        }
+// Hapus semua pemain lain (saat reset game atau tidak ada data)
+function clearOtherPlayers() {
+    Object.keys(otherPlayerObjects).forEach(playerKey => {
+        scene.remove(otherPlayerObjects[playerKey]);
+    });
+    otherPlayerObjects = {};
+    otherPlayers = {};
+}
 
-        // Simpan data musuh ke Firebase
-        function saveEnemyData() {
-            if (!enemy || !enemyRef || gameOver || gameWin || !isOnline) return;
-            
-            const enemyData = {
-                x: enemy.position.x,
-                y: enemy.position.y,
-                z: enemy.position.z,
-                rotationY: enemy.rotation.y,
-                hp: enemyHP,
-                status: getEnemyStatus(),
-                timestamp: Date.now()
-            };
-            
-            enemyRef.set(enemyData);
-        }
+// Fungsi restart game yang diperbarui
+function restartGame() {
+    // Hapus semua data dari Firebase
+    if (playersRef) {
+        playersRef.remove();
+    }
+    if (gameStateRef) {
+        gameStateRef.remove();
+    }
+    
+    // Hapus data pemain lokal
+    if (currentPlayerRef) {
+        currentPlayerRef.remove();
+    }
+    
+    // Refresh halaman
+    location.reload();
+}
 
-        // Update enemy dari server
-        function updateEnemyFromServer(enemyData) {
-            if (!enemy || gameOver || gameWin) return;
-            
-            // Update posisi musuh dengan interpolasi untuk mengurangi lag
-            enemy.position.lerp(
-                new THREE.Vector3(enemyData.x, enemyData.y, enemyData.z), 
-                0.5
-            );
-            enemy.rotation.y = enemyData.rotationY || 0;
-            
-            // Update HP musuh
-            if (enemyHP !== enemyData.hp) {
-                enemyHP = enemyData.hp;
-                updateEnemyHP();
-                checkWin();
-            }
-        }
+// Update jumlah pemain online
+function updatePlayerCount() {
+    const count = getOnlinePlayersCount() + 1; // +1 untuk pemain sendiri
+    document.getElementById('player-count').textContent = count;
+    
+    if (count > 1) {
+        document.getElementById('multiplayer-status').textContent = 'MABAR: ' + count + ' pemain online';
+    } else {
+        document.getElementById('multiplayer-status').textContent = 'MABAR: Menunggu pemain...';
+    }
+}
 
-        // Render pemain lain di layar
-        function renderOtherPlayers(players) {
-            if (!players || !isOnline) return;
-            
-            // Hapus pemain yang sudah tidak aktif (lebih dari 5 detik)
-            const currentTime = Date.now();
-            Object.keys(otherPlayerObjects).forEach(playerKey => {
-                if (!players[playerKey] || (currentTime - players[playerKey].timestamp) > 5000) {
-                    if (otherPlayerObjects[playerKey]) {
-                        scene.remove(otherPlayerObjects[playerKey]);
-                        delete otherPlayerObjects[playerKey];
-                        delete otherPlayers[playerKey];
-                    }
-                }
-            });
-            
-            // Tambah atau update pemain lain
-            Object.keys(players).forEach(playerKey => {
-                if (playerKey !== playerId) {
-                    const playerData = players[playerKey];
-                    
-                    if (!otherPlayerObjects[playerKey]) {
-                        // Buat karakter baru untuk pemain lain
-                        createOtherPlayer(playerKey, playerData);
-                    } else {
-                        // Update posisi dan rotasi pemain yang sudah ada
-                        updateOtherPlayer(playerKey, playerData);
-                    }
-                    
-                    otherPlayers[playerKey] = playerData;
-                }
-            });
-            
-            // Update jumlah pemain online
-            updatePlayerCount();
-        }
+// ========== INISIALISASI MULTIPLAYER ==========
+// Panggil initMultiplayer() dalam fungsi init() setelah membuat player
 
-        // Buat karakter untuk pemain lain
+        // Buat karakter untuk pemain lain dengan skin yang sesuai
         function createOtherPlayer(playerKey, playerData) {
             const otherPlayer = new THREE.Group();
             
-            // Kepala
-            const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-            const headMaterial = new THREE.MeshStandardMaterial({ color: 0x00FF00 });
-            const head = new THREE.Mesh(headGeometry, headMaterial);
-            head.position.y = 1.7;
-            otherPlayer.add(head);
-            
-            // Badan
-            const bodyGeometry = new THREE.BoxGeometry(1, 1.2, 0.5);
-            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x00AA00 });
-            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            body.position.y = 0.8;
-            otherPlayer.add(body);
-            
-            // Tangan
-            const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
-            const armMaterial = new THREE.MeshStandardMaterial({ color: 0x00AA00 });
-            
-            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-            leftArm.position.set(0.6, 0.7, 0);
-            leftArm.rotation.z = Math.PI / 6;
-            otherPlayer.add(leftArm);
-            
-            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-            rightArm.position.set(-0.6, 0.7, 0);
-            rightArm.rotation.z = -Math.PI / 6;
-            otherPlayer.add(rightArm);
-            
-            // Kaki
-            const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8);
-            const legMaterial = new THREE.MeshStandardMaterial({ color: 0x008800 });
-            
-            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-            leftLeg.position.set(0.25, -0.8, 0);
-            otherPlayer.add(leftLeg);
-            
-            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-            rightLeg.position.set(-0.25, -0.8, 0);
-            otherPlayer.add(rightLeg);
+            // Buat karakter berdasarkan elemen yang dipilih
+            switch(playerData.element) {
+                case 'root':
+                    createElementalSkin(otherPlayer, 0x00AA00, 0x00FF00, 0x00AA00, 0x006600);
+                    break;
+                case 'solar':
+                    createElementalSkin(otherPlayer, 0xFFFFFF, 0xFFFF00, 0xFFFFFF, 0xFFFFFF);
+                    break;
+                case 'wave':
+                    createElementalSkin(otherPlayer, 0x00BFFF, 0x00FFFF, 0x00BFFF, 0x0000FF);
+                    break;
+                case 'tornado':
+                    createElementalSkin(otherPlayer, 0x000080, 0x4169E1, 0x000080, 0x000080);
+                    break;
+                case 'blaze':
+                    createElementalSkin(otherPlayer, 0xFF4500, 0xFF0000, 0xFF4500, 0xFF4500);
+                    break;
+                case 'earthquake':
+                    createElementalSkin(otherPlayer, 0x8B4513, 0xA0522D, 0x8B4513, 0x8B4513);
+                    break;
+                case 'thunder':
+                    createElementalSkin(otherPlayer, 0xFF0000, 0xFF4500, 0xFF0000, 0xFF0000);
+                    break;
+                default:
+                    // Default skin (normal)
+                    createDefaultSkin(otherPlayer);
+            }
             
             // Nama pemain
             const canvas = document.createElement('canvas');
@@ -585,9 +579,6 @@
             otherPlayer.position.set(playerData.x, playerData.y, playerData.z);
             otherPlayer.rotation.y = playerData.rotationY || 0;
             
-            // Update warna berdasarkan elemen
-            updateOtherPlayerElement(otherPlayer, playerData.element);
-            
             // Tambah ke scene
             scene.add(otherPlayer);
             otherPlayerObjects[playerKey] = otherPlayer;
@@ -601,82 +592,103 @@
             }, 3000);
         }
 
+        // Buat skin default untuk pemain lain
+        function createDefaultSkin(playerObj) {
+            // Kepala
+            const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ color: 0x00FF00 });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.7;
+            playerObj.add(head);
+            
+            // Badan
+            const bodyGeometry = new THREE.BoxGeometry(1, 1.2, 0.5);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x00AA00 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.8;
+            playerObj.add(body);
+            
+            // Tangan
+            const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: 0x00AA00 });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(0.6, 0.7, 0);
+            leftArm.rotation.z = Math.PI / 6;
+            playerObj.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(-0.6, 0.7, 0);
+            rightArm.rotation.z = -Math.PI / 6;
+            playerObj.add(rightArm);
+            
+            // Kaki
+            const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({ color: 0x008800 });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(0.25, -0.8, 0);
+            playerObj.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(-0.25, -0.8, 0);
+            playerObj.add(rightLeg);
+        }
+
+        // Buat skin elemental untuk pemain lain
+        function createElementalSkin(playerObj, bodyColor, headColor, armColor, legColor) {
+            // Kepala
+            const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ color: headColor });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.7;
+            playerObj.add(head);
+            
+            // Badan
+            const bodyGeometry = new THREE.BoxGeometry(1, 1.2, 0.5);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.8;
+            playerObj.add(body);
+            
+            // Tangan
+            const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: armColor });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(0.6, 0.7, 0);
+            leftArm.rotation.z = Math.PI / 6;
+            playerObj.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(-0.6, 0.7, 0);
+            rightArm.rotation.z = -Math.PI / 6;
+            playerObj.add(rightArm);
+            
+            // Kaki
+            const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({ color: legColor });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(0.25, -0.8, 0);
+            playerObj.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(-0.25, -0.8, 0);
+            playerObj.add(rightLeg);
+        }
+
         // Update posisi dan rotasi pemain lain
         function updateOtherPlayer(playerKey, playerData) {
             const otherPlayer = otherPlayerObjects[playerKey];
             if (otherPlayer) {
-                // Smooth movement dengan interpolasi untuk mengurangi lag
+                // Smooth movement
                 otherPlayer.position.lerp(
                     new THREE.Vector3(playerData.x, playerData.y, playerData.z), 
                     0.5
                 );
                 otherPlayer.rotation.y = playerData.rotationY || 0;
-                
-                // Update warna berdasarkan elemen
-                updateOtherPlayerElement(otherPlayer, playerData.element);
             }
-        }
-
-        // Update tampilan pemain lain berdasarkan elemen
-        function updateOtherPlayerElement(otherPlayer, element) {
-            // Default warna hijau
-            let bodyColor = 0x00AA00;
-            let headColor = 0x00FF00;
-            let armColor = 0x00AA00;
-            let legColor = 0x008800;
-            
-            switch(element) {
-                case 'root':
-                    bodyColor = 0x00AA00;
-                    headColor = 0x00FF00;
-                    armColor = 0x00AA00;
-                    legColor = 0x006600;
-                    break;
-                case 'solar':
-                    bodyColor = 0xFFFFFF;
-                    headColor = 0xFFFF00;
-                    armColor = 0xFFFFFF;
-                    legColor = 0xFFFFFF;
-                    break;
-                case 'wave':
-                    bodyColor = 0x00BFFF;
-                    headColor = 0x00FFFF;
-                    armColor = 0x00BFFF;
-                    legColor = 0x0000FF;
-                    break;
-                case 'tornado':
-                    bodyColor = 0x000080;
-                    headColor = 0x4169E1;
-                    armColor = 0x000080;
-                    legColor = 0x000080;
-                    break;
-                case 'blaze':
-                    bodyColor = 0xFF4500;
-                    headColor = 0xFF0000;
-                    armColor = 0xFF4500;
-                    legColor = 0xFF4500;
-                    break;
-                case 'earthquake':
-                    bodyColor = 0x8B4513;
-                    headColor = 0xA0522D;
-                    armColor = 0x8B4513;
-                    legColor = 0x8B4513;
-                    break;
-                case 'thunder':
-                    bodyColor = 0xFF0000;
-                    headColor = 0xFF4500;
-                    armColor = 0xFF0000;
-                    legColor = 0xFF0000;
-                    break;
-            }
-            
-            // Terapkan warna
-            if (otherPlayer.children[0]) otherPlayer.children[0].material.color.setHex(headColor); // Kepala
-            if (otherPlayer.children[1]) otherPlayer.children[1].material.color.setHex(bodyColor); // Badan
-            if (otherPlayer.children[2]) otherPlayer.children[2].material.color.setHex(armColor);  // Tangan kiri
-            if (otherPlayer.children[3]) otherPlayer.children[3].material.color.setHex(armColor);  // Tangan kanan
-            if (otherPlayer.children[4]) otherPlayer.children[4].material.color.setHex(legColor);  // Kaki kiri
-            if (otherPlayer.children[5]) otherPlayer.children[5].material.color.setHex(legColor);  // Kaki kanan
         }
 
         // Update jumlah pemain online
@@ -701,14 +713,6 @@
         // Fungsi untuk mendapatkan jumlah pemain online
         function getOnlinePlayersCount() {
             return Object.keys(otherPlayers).length;
-        }
-
-        // Dapatkan status musuh
-        function getEnemyStatus() {
-            if (enemyBound) return "Terikat Akar";
-            if (enemyOnFire) return "Terbakar";
-            if (enemySlowed) return "Melambat";
-            return "Normal";
         }
 
         // ========== KODE GAME YANG SUDAH ADA ==========
@@ -745,7 +749,7 @@
             // Buat tanah
             createGround();
 
-            // Buat pohon
+            // Buat pohon (hanya 3)
             createTrees();
 
             // Buat karakter player dengan skin default
@@ -764,9 +768,8 @@
             // Terapkan skin default
             applyDefaultSkin();
 
-            // Periksa koneksi internet
-            checkConnection();
-            connectionCheckInterval = setInterval(checkConnection, 5000);
+            // Inisialisasi sistem multiplayer
+            initMultiplayer();
 
             // Start animation loop
             animate();
@@ -785,17 +788,15 @@
             scene.add(ground);
         }
 
-        // Buat pohon-pohon
+        // Buat pohon-pohon (hanya 3)
         function createTrees() {
             const treePositions = [
                 { x: -10, z: -10 },
                 { x: 10, z: -10 },
-                { x: -10, z: 10 },
-                { x: 10, z: 10 },
-                { x: 0, z: 0 }
+                { x: 0, z: 10 }
             ];
 
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < 3; i++) {
                 // Batang pohon
                 const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.7, 4, 8);
                 const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
@@ -1061,8 +1062,8 @@
             document.getElementById('skill-thunder').addEventListener('click', () => changeSkill('thunder'));
             
             // Restart button
-            document.getElementById('restart-btn').addEventListener('click', resetGame);
-            document.getElementById('win-restart-btn').addEventListener('click', resetGame);
+            document.getElementById('restart-btn').addEventListener('click', restartGame);
+            document.getElementById('win-restart-btn').addEventListener('click', restartGame);
             
             // Window resize event
             window.addEventListener('resize', onWindowResize);
@@ -1492,6 +1493,9 @@
             // PERBAIKAN: Skill tidak kembali ke normal setelah digunakan
             // Hanya update info skill
             document.getElementById('skill-info').textContent = `Skill ${getSkillName(currentSkill)} telah digunakan!`;
+            
+            // Update game state ke Firebase
+            saveGameState();
         }
 
         function useRootSkill() {
@@ -1711,13 +1715,13 @@
         }
 
         function useTornadoSkill() {
-            // Create tornado effect - diperbaiki
+            // Create tornado effect - diperbaiki dengan bentuk kerucut terbalik
             const tornadoGroup = new THREE.Group();
             tornadoGroup.position.copy(enemy.position);
             tornadoGroup.position.y += 1;
             
-            // Create tornado body (kerucut besar)
-            const tornadoGeometry = new THREE.ConeGeometry(2, 6, 16);
+            // Create tornado body (kerucut terbalik - lancip di bawah, lebar di atas)
+            const tornadoGeometry = new THREE.ConeGeometry(0.5, 6, 16); // Radius kecil di bawah, tinggi 6
             const tornadoMaterial = new THREE.MeshBasicMaterial({
                 color: 0x87CEEB,
                 transparent: true,
@@ -1726,10 +1730,12 @@
             });
             
             const tornado = new THREE.Mesh(tornadoGeometry, tornadoMaterial);
+            tornado.position.y = 3; // Posisikan agar ujung lancip di bawah
+            tornado.rotation.x = Math.PI; // Putar 180 derajat agar lancip di bawah
             tornadoGroup.add(tornado);
             
             // Add swirling particles (abu-abu dan biru)
-            const particleCount = 20;
+            const particleCount = 30;
             for (let i = 0; i < particleCount; i++) {
                 const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
                 const particleMaterial = new THREE.MeshBasicMaterial({
@@ -1741,8 +1747,8 @@
                 const particle = new THREE.Mesh(particleGeometry, particleMaterial);
                 
                 // Position particles in a spiral pattern
-                const radius = Math.random() * 1.5;
-                const height = Math.random() * 5;
+                const radius = Math.random() * 2; // Radius lebih besar
+                const height = Math.random() * 6; // Tinggi sesuai tornado
                 const angle = Math.random() * Math.PI * 2;
                 
                 particle.position.set(
@@ -1773,8 +1779,8 @@
                         child.position.z = Math.sin(child.userData.angle) * child.userData.radius;
                         
                         // Move particles upward
-                        child.position.y += 0.05;
-                        if (child.position.y > 5) {
+                        child.position.y += 0.1;
+                        if (child.position.y > 6) {
                             child.position.y = 0;
                         }
                     }
@@ -2233,11 +2239,8 @@
                 gameOver = true;
                 document.getElementById('game-over').style.display = 'block';
                 
-                // Reset database dan refresh browser
-                setTimeout(() => {
-                    cleanupMultiplayer();
-                    location.reload();
-                }, 3000);
+                // Simpan status game over ke Firebase
+                saveGameState();
             }
         }
 
@@ -2246,63 +2249,19 @@
                 gameWin = true;
                 document.getElementById('game-win').style.display = 'block';
                 
-                // Reset database dan refresh browser
-                setTimeout(() => {
-                    cleanupMultiplayer();
-                    location.reload();
-                }, 3000);
+                // Simpan status kemenangan ke Firebase
+                saveGameState();
             }
         }
 
-        function resetGame() {
-            // Reset semua variabel game
-            playerHP = 200;
-            enemyHP = 500;
-            currentSkill = 'normal';
-            gameOver = false;
-            gameWin = false;
-            
-            // Reset posisi
-            player.position.set(0, 1, 0);
-            enemy.position.set(5, 1, 5);
-            
-            // Reset UI
-            updatePlayerHP();
-            updateEnemyHP();
-            updateEnemyStatus();
-            document.getElementById('current-skill').textContent = 'Mode: Normal';
-            document.getElementById('skill-info').textContent = 'Klik 🆙 untuk memilih elemen, lalu klik SKILL untuk menggunakan skill';
-            document.getElementById('game-over').style.display = 'none';
-            document.getElementById('game-win').style.display = 'none';
-            
-            // Reset player appearance
-            applyDefaultSkin();
-            
-            // Reset status efek
-            enemyBound = false;
-            enemyOnFire = false;
-            enemySlowed = false;
-            skillActive = false;
-            
-            // Hapus earthquake wall jika ada
-            if (earthquakeWall) {
-                scene.remove(earthquakeWall);
-                earthquakeWall.geometry.dispose();
-                earthquakeWall.material.dispose();
-                earthquakeWall = null;
+        function restartGame() {
+            // Hapus data game dari Firebase
+            if (gameStateRef) {
+                gameStateRef.remove();
             }
             
-            // Hapus semua efek skill yang aktif
-            skillEffects.forEach(effect => {
-                scene.remove(effect);
-                effect.geometry.dispose();
-                effect.material.dispose();
-            });
-            skillEffects = [];
-            
-            // Reset multiplayer data
-            savePlayerData();
-            saveEnemyData();
+            // Refresh halaman
+            location.reload();
         }
 
         function onWindowResize() {
@@ -2311,7 +2270,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Animate enemy movement dengan AI yang lebih cerdas
+        // Animate enemy movement dengan animasi yang lebih baik
         function animateEnemy() {
             if (enemyBound) return;
             
@@ -2323,23 +2282,9 @@
                 }
             }
             
-            // AI: Cari player terdekat (player utama atau player lain)
-            let targetPlayer = player;
-            let minDistance = player.position.distanceTo(enemy.position);
-            
-            // Cek player lain
-            Object.keys(otherPlayerObjects).forEach(playerKey => {
-                const otherPlayer = otherPlayerObjects[playerKey];
-                const distance = otherPlayer.position.distanceTo(enemy.position);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    targetPlayer = otherPlayer;
-                }
-            });
-            
-            // Bergerak menuju player terdekat
+            // Simple AI: move towards player
             const direction = new THREE.Vector3()
-                .subVectors(targetPlayer.position, enemy.position)
+                .subVectors(player.position, enemy.position)
                 .normalize();
             
             // Move slower when bound or slowed
@@ -2374,10 +2319,10 @@
                 enemy.position.z += direction.z * speed;
             }
             
-            // Rotate enemy to face player terdekat
+            // Rotate enemy to face player
             enemy.rotation.y = Math.atan2(
-                targetPlayer.position.x - enemy.position.x,
-                targetPlayer.position.z - enemy.position.z
+                player.position.x - enemy.position.x,
+                player.position.z - enemy.position.z
             );
             
             // Animasi berjalan musuh yang lebih smooth
@@ -2409,6 +2354,9 @@
                     createEnemyAttackEffect();
                 }
             }
+            
+            // Simpan posisi musuh ke Firebase setiap frame
+            saveGameState();
         }
 
         function createEnemyAttackEffect() {
